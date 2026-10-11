@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+
+<meta charset="utf-8">
+<meta content="width=device-width,initial-scale=1" name="viewport">
+<title>MeOS · 一个会"认识你"的个人 Agent 操作系统</title>
+<style>
+:root{
+  --bg:#f2f5fa; --panel:#ffffff; --panel2:#fafbfe; --line:#e2e8f2; --line2:#eef2f8;
+  --ink:#14203a; --ink2:#3d4d6b; --mut:#7c8aa5; --faint:#a8b4c8;
+  --acc:#4f6ef7; --acc2:#7c5cff; --teal:#0ea5a4; --amber:#f59e0b; --rose:#f43f5e;
+  --green:#10b981; --slate:#94a3b8;
+  --sh:0 1px 2px rgba(20,32,58,.05),0 8px 24px rgba(20,32,58,.06);
+  --sh2:0 2px 6px rgba(20,32,58,.06),0 18px 50px rgba(20,32,58,.12);
+  --r:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+  font-family:"Inter","Segoe UI","Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;overflow:hidden}
+body{display:flex;flex-direction:column;padding:14px 18px 12px;gap:12px}
+.mono{font-family:"JetBrains Mono","Cascadia Mono",Consolas,monospace}
+
+/* ---------- header ---------- */
+header{display:flex;align-items:center;gap:18px;flex:0 0 auto}
+.brand{font-size:25px;font-weight:800;letter-spacing:-.6px;display:flex;align-items:baseline;gap:9px}
+.brand i{width:11px;height:11px;border-radius:50%;background:linear-gradient(135deg,var(--acc),var(--acc2));
+  box-shadow:0 0 0 4px rgba(79,110,247,.16);display:inline-block;transform:translateY(-1px)}
+.brand small{font-size:11px;font-weight:600;color:var(--acc);background:rgba(79,110,247,.1);
+  padding:2px 7px;border-radius:99px;letter-spacing:.3px}
+.tag{color:var(--mut);font-size:13.5px;border-left:1px solid var(--line);padding-left:18px;line-height:1.35}
+.tag b{color:var(--ink2);font-weight:600}
+.spacer{flex:1}
+.days{display:flex;gap:6px;align-items:center}
+#days{display:flex;gap:6px}
+.days .lbl{font-size:11.5px;color:var(--faint);margin-right:2px;letter-spacing:.5px}
+.day{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--panel);
+  color:var(--ink2);font-weight:700;font-size:13px;cursor:pointer;transition:.16s;display:grid;place-items:center}
+.day:hover{border-color:var(--acc);color:var(--acc);transform:translateY(-1px)}
+.day.on{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;border-color:transparent;
+  box-shadow:0 6px 16px rgba(79,110,247,.35)}
+.play{border:none;background:linear-gradient(135deg,#14203a,#2c3f66);color:#fff;font-weight:650;font-size:13px;
+  padding:0 18px;height:38px;border-radius:10px;cursor:pointer;letter-spacing:.3px;
+  box-shadow:0 6px 18px rgba(20,32,58,.22)}
+.play.on{background:linear-gradient(135deg,var(--acc),var(--acc2))}
+
+/* ---------- layout ---------- */
+main{flex:1 1 auto;display:grid;grid-template-columns:280px 1fr 320px;gap:12px;min-height:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);
+  display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.ph{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line2);flex:0 0 auto}
+.ph h3{margin:0;font-size:12.5px;font-weight:700;letter-spacing:.4px;color:var(--ink)}
+.ph .k{margin-left:auto;font-size:10.5px;color:var(--faint);letter-spacing:.4px}
+.pb{padding:12px 14px;overflow:auto;min-height:0;flex:1 1 auto}
+.pb::-webkit-scrollbar{width:5px}.pb::-webkit-scrollbar-thumb{background:#d5dce9;border-radius:9px}
+
+/* ---------- agents ---------- */
+.agent{border:1px solid var(--line);border-radius:11px;padding:10px 11px;margin-bottom:8px;
+  background:var(--panel2);transition:.28s;position:relative;overflow:hidden}
+.agent:last-child{margin-bottom:0}
+.agent .top{display:flex;align-items:center;gap:7px}
+.agent .nm{font-size:12.5px;font-weight:700}
+.agent .ic{width:19px;height:19px;border-radius:6px;display:grid;place-items:center;font-size:11px;color:#fff}
+.agent .dot{margin-left:auto;width:7px;height:7px;border-radius:50%;background:#d8e0ee;transition:.2s}
+.agent .out{font-size:11px;color:var(--mut);line-height:1.5;margin-top:6px}
+.agent .out b{color:var(--ink2);font-weight:650}
+.agent.live{border-color:var(--acc);background:#f6f8ff;box-shadow:0 6px 20px rgba(79,110,247,.13);transform:translateX(2px)}
+.agent.live .dot{background:var(--acc);box-shadow:0 0 0 4px rgba(79,110,247,.18);animation:pulse 1.1s infinite}
+.agent.done .dot{background:var(--green)}
+@keyframes pulse{50%{box-shadow:0 0 0 7px rgba(79,110,247,0)}}
+.streak{position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--acc),var(--acc2));
+  opacity:0;transition:.3s}
+.agent.live .streak,.agent.done .streak{opacity:1}
+
+/* ---------- log ---------- */
+.logbox{margin-top:10px;border-top:1px solid var(--line2);padding-top:8px}
+.logline{font-size:10.5px;line-height:1.5;color:var(--mut);padding:3px 0;
+  border-bottom:1px dashed var(--line2);display:flex;gap:6px;animation:sl .3s ease both}
+.logline:last-child{border-bottom:none}
+.logline b{color:var(--acc);font-weight:650;flex:0 0 auto}
+@keyframes sl{from{opacity:0;transform:translateY(-3px)}}
+
+/* ---------- timeline ---------- */
+.tl{padding:6px 16px 0}
+.hours{display:flex;position:relative;height:17px;margin-bottom:4px}
+.hours span{position:absolute;font-size:9.5px;color:var(--faint);transform:translateX(-50%);
+  font-family:"JetBrains Mono",monospace}
+.track{position:relative;height:34px;margin-bottom:5px;background:var(--panel2);
+  border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.track.thin{height:20px}
+.gold{position:absolute;top:0;bottom:0;background:linear-gradient(180deg,rgba(245,158,11,.16),rgba(245,158,11,.05));
+  border-top:1px dashed rgba(245,158,11,.5);border-bottom:1px dashed rgba(245,158,11,.5)}
+.ban{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(135deg,
+  rgba(148,163,184,.22) 0 5px,rgba(148,163,184,.06) 5px 10px);border-left:1px solid #cbd5e1;border-right:1px solid #cbd5e1}
+.bk{position:absolute;top:3px;bottom:3px;border-radius:6px;display:flex;align-items:center;padding:0 6px;
+  font-size:10px;font-weight:600;color:#fff;overflow:hidden;white-space:nowrap;cursor:pointer;transition:.15s;
+  border:1px solid rgba(255,255,255,.35)}
+.bk:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 4px 12px rgba(20,32,58,.22);z-index:3}
+.bk.sel{outline:2px solid var(--ink);outline-offset:1px;z-index:4}
+.bk.focus{background:linear-gradient(135deg,var(--acc),#6b86ff)}
+.bk.focus.creative{background:linear-gradient(135deg,var(--acc2),#9a80ff)}
+.bk.buffer{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#4a2c00}
+.bk.recovery{background:repeating-linear-gradient(135deg,#cbd5e1 0 6px,#e2e8f0 6px 12px);color:#475569}
+.bk.health{background:linear-gradient(135deg,#34d399,#10b981)}
+.ab{position:absolute;height:5px;border-radius:3px;opacity:.95}
+.ab.done{background:var(--green)}.ab.partial{background:var(--amber)}.ab.skipped{background:var(--rose)}
+.legend{display:flex;gap:14px;align-items:center;padding:9px 16px 4px;font-size:10.5px;color:var(--mut);flex-wrap:wrap}
+.legend i{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:4px;vertical-align:-1px}
+.rationale{margin:8px 16px 0;background:linear-gradient(135deg,#f6f8ff,#fbfaff);border:1px solid #e4e9ff;
+  border-left:3px solid var(--acc);border-radius:10px;padding:9px 12px;font-size:12px;line-height:1.6;color:var(--ink2)}
+.rationale b{color:var(--acc);font-weight:700}
+.detail{margin:8px 16px 12px;border:1px solid var(--line);border-radius:10px;padding:9px 12px;
+  font-size:11.5px;line-height:1.6;color:var(--ink2);background:var(--panel2);min-height:56px}
+.detail .t{font-weight:700;font-size:12px;display:flex;align-items:center;gap:8px}
+.detail .m{color:var(--mut);font-size:10.5px;margin-top:3px}
+.detail .r{color:var(--acc);margin-top:5px}
+.detail .g{color:var(--amber);margin-top:3px}
+
+/* ---------- memory ---------- */
+.kv{display:grid;grid-template-columns:1fr auto;gap:3px 8px;font-size:11.5px;margin-bottom:3px}
+.kv .k{color:var(--mut)}.kv .v{font-weight:700;font-family:"JetBrains Mono",monospace;color:var(--ink)}
+.tagrow{display:flex;gap:5px;flex-wrap:wrap;margin:7px 0 9px}
+.pill{font-size:10px;padding:2.5px 7px;border-radius:99px;font-weight:650;letter-spacing:.2px}
+.pill.b{background:rgba(79,110,247,.11);color:#3b5bdb}
+.pill.g{background:rgba(16,185,129,.13);color:#0b7a5b}
+.pill.a{background:rgba(245,158,11,.15);color:#a5620a}
+.pill.r{background:rgba(244,63,94,.12);color:#c02a4b}
+.pill.s{background:rgba(148,163,184,.16);color:#5b6a83}
+.exp{border:1px solid var(--line);border-left:3px solid var(--acc2);border-radius:9px;padding:8px 10px;
+  margin-bottom:7px;background:var(--panel2);animation:sl .3s ease both}
+.exp .ls{font-size:11.5px;font-weight:700;color:#5b3fd6;line-height:1.5}
+.exp .rf{font-size:10.5px;color:var(--mut);line-height:1.55;margin-top:4px}
+.exp .sc{font-size:9.5px;color:var(--faint);margin-top:4px;font-family:"JetBrains Mono",monospace}
+.vec{width:100%;height:118px;border:1px solid var(--line);border-radius:10px;background:
+  radial-gradient(circle at 50% 50%,#fbfcff,#f3f6fc);margin-bottom:8px}
+
+/* ---------- footer ---------- */
+footer{flex:0 0 214px;display:grid;grid-template-columns:1.45fr 1fr;gap:12px;min-height:0}
+.chartwrap{padding:4px 10px 8px}
+.cmp{display:grid;grid-template-columns:auto 1fr 1fr;gap:5px 10px;font-size:11.5px;align-items:center}
+.cmp .hd{font-size:10.5px;color:var(--faint);font-weight:700;letter-spacing:.4px}
+.cmp .hd.d1{color:var(--rose)}.cmp .hd.d7{color:var(--green)}
+.cmp .lb{color:var(--mut)}
+.cmp .v{font-weight:750;font-family:"JetBrains Mono",monospace}
+.delta{font-size:10px;margin-left:4px;font-weight:700}
+.up{color:var(--green)}.down{color:var(--acc)}
+
+/* ---------- subtitle + overlay ---------- */
+.sub{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);max-width:1180px;
+  background:rgba(20,32,58,.9);color:#fff;font-size:15.5px;line-height:1.6;padding:12px 22px;
+  border-radius:12px;backdrop-filter:blur(8px);box-shadow:var(--sh2);opacity:0;transition:opacity .35s;
+  text-align:center;letter-spacing:.2px;z-index:60;font-weight:500}
+.sub.on{opacity:1}
+.sub em{font-style:normal;color:#9db4ff;font-weight:700}
+.ov{position:fixed;inset:0;background:rgba(238,242,249,.9);backdrop-filter:blur(5px);z-index:50;
+  display:none;align-items:center;justify-content:center;padding:46px 60px}
+.ov.on{display:flex;animation:fi .4s ease both}
+@keyframes fi{from{opacity:0}}
+/* 覆盖层内容逐条浮现：静态卡片撑十几秒会让人以为视频卡住了 */
+.ovc .blk,.ovc .stat,.ovc table.tt tr,.ovc .pnode,.ovc pre{animation:su .55s cubic-bezier(.22,1,.36,1) both}
+.ovc .blk:nth-child(1),.ovc .stat:nth-child(1),.ovc .pnode:nth-child(1){animation-delay:.05s}
+.ovc .blk:nth-child(2),.ovc .stat:nth-child(2),.ovc .pnode:nth-child(3){animation-delay:.16s}
+.ovc .blk:nth-child(3),.ovc .stat:nth-child(3),.ovc .pnode:nth-child(5){animation-delay:.27s}
+.ovc .blk:nth-child(4),.ovc .pnode:nth-child(7){animation-delay:.38s}
+.ovc table.tt tr:nth-child(1){animation-delay:.02s}
+.ovc table.tt tr:nth-child(2){animation-delay:.10s}
+.ovc table.tt tr:nth-child(3){animation-delay:.18s}
+.ovc table.tt tr:nth-child(4){animation-delay:.26s}
+.ovc table.tt tr:nth-child(5){animation-delay:.34s}
+.ovc table.tt tr:nth-child(6){animation-delay:.42s}
+.ovc table.tt tr:nth-child(7){animation-delay:.50s}
+.ovc table.tt tr:nth-child(8){animation-delay:.58s}
+@keyframes su{from{opacity:0;transform:translateY(9px)}}
+.ovc{background:var(--panel);border:1px solid var(--line);border-radius:20px;box-shadow:var(--sh2);
+  padding:30px 36px;max-width:1400px;width:100%;max-height:100%;overflow:auto}
+.ovc h2{margin:0 0 6px;font-size:27px;letter-spacing:-.7px}
+.ovc h2 span{color:var(--acc)}
+.ovc .sb{color:var(--mut);font-size:13.5px;margin-bottom:20px}
+.pipe{display:flex;align-items:stretch;gap:0;margin:8px 0 20px}
+.pnode{flex:1;border:1.5px solid var(--line);border-radius:13px;padding:13px 14px;background:var(--panel2);transition:.2s}
+.pnode.on{border-color:var(--acc);background:#f5f8ff;box-shadow:0 8px 24px rgba(79,110,247,.14)}
+.pnode .pt{font-size:14px;font-weight:750;display:flex;align-items:center;gap:7px}
+.pnode .pd{font-size:11.5px;color:var(--mut);line-height:1.55;margin-top:6px}
+.pnode .pk{font-size:10.5px;color:var(--acc);margin-top:7px;font-weight:650}
+.parrow{display:grid;place-items:center;padding:0 7px;color:var(--faint);font-size:17px}
+.memstrip{margin-top:16px;border:1.5px dashed #c9d4e8;border-radius:13px;padding:12px 16px;background:#fafcff}
+.memstrip .mt{font-size:12.5px;font-weight:750;margin-bottom:6px}
+.memstrip .md{font-size:11.5px;color:var(--mut);line-height:1.6}
+pre.prompt{background:#0f1a2e;color:#cfe0ff;border-radius:12px;padding:16px 18px;font-size:11.5px;
+  line-height:1.62;overflow:auto;max-height:330px;white-space:pre-wrap;
+  font-family:"JetBrains Mono","Cascadia Mono",Consolas,monospace}
+pre.prompt .g{color:#6ee7b7}.pw{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;margin-top:14px}
+.blk{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-bottom:9px}
+.blk .bt{font-size:11.5px;font-weight:750;color:var(--acc);margin-bottom:5px;letter-spacing:.3px}
+.blk .bd{font-size:11.5px;color:var(--ink2);line-height:1.6}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.stat{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--panel2)}
+.stat .n{font-size:30px;font-weight:800;letter-spacing:-1.2px;font-family:"Inter",system-ui}
+.stat .n.a{color:var(--acc)}.stat .n.g{color:var(--green)}.stat .n.r{color:var(--rose)}
+.stat .l{font-size:11.5px;color:var(--mut);margin-top:2px}
+.stat .d{font-size:10.5px;color:var(--faint);margin-top:5px;line-height:1.45}
+table.tt{width:100%;border-collapse:collapse;font-size:12px}
+table.tt th,table.tt td{padding:7px 9px;text-align:left;border-bottom:1px solid var(--line2)}
+table.tt th{font-size:10.5px;color:var(--faint);font-weight:700;letter-spacing:.4px}
+table.tt td.n{font-family:"JetBrains Mono",monospace;font-weight:700}
+.hint{position:fixed;left:336px;bottom:248px;font-size:10.5px;color:var(--faint);
+  z-index:20;pointer-events:none;letter-spacing:.2px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><i></i>MeOS <small id="ver">v0.1 MVP</small></div>
+  <div class="tag">一个会<b>"认识你"</b>的个人 Agent 操作系统 &nbsp;·&nbsp; 感知 → 规划 → 执行 → 复盘 → 进化</div>
+  <div class="spacer"></div>
+  <div class="days"><span class="lbl">DAY</span><div id="days"></div></div>
+  <button class="play" id="play">▶ 自动演示</button>
+</header>
+
+<main>
+  <!-- 左：四个 Agent -->
+  <section class="panel">
+    <div class="ph"><h3>AGENT 运行状态</h3><span class="k" id="vtag">画像 v0</span></div>
+    <div class="pb">
+      <div id="agents"></div>
+      <div class="logbox" id="logbox"></div>
+    </div>
+  </section>
+
+  <!-- 中：时间轴 -->
+  <section class="panel">
+    <div class="ph"><h3 id="tlTitle">DAY 1 · 今日计划</h3>
+      <span class="k" id="tlMeta"></span></div>
+    <div class="tl" id="tl"></div>
+    <div class="rationale" id="rationale"></div>
+    <div class="detail" id="detail"></div>
+  </section>
+
+  <!-- 右：记忆库 -->
+  <section class="panel">
+    <div class="ph"><h3>记忆库 / 用户画像</h3><span class="k" id="memStat"></span></div>
+    <div class="pb">
+      <svg class="vec" id="vec" viewBox="0 0 300 118"></svg>
+      <div class="kv" id="kv"></div>
+      <div class="tagrow" id="chips"></div>
+      <div id="exps"></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <section class="panel">
+    <div class="ph"><h3>7 天学习曲线</h3><span class="k">数据源：真实运行输出 · 非示意</span></div>
+    <div class="chartwrap"><svg id="curve" viewBox="0 0 760 168" style="width:100%; height:164px"></svg></div>
+  </section>
+  <section class="panel">
+    <div class="ph"><h3>DAY 1 vs DAY 7</h3><span class="k">同一套引擎</span></div>
+    <div class="pb" style="padding-top:10px"><div class="cmp" id="cmp"></div></div>
+  </section>
+</footer>
+
+<div class="sub" id="sub"></div>
+<div class="ov" id="ov"><div class="ovc" id="ovc"></div></div>
+<div class="hint" id="hint">点击日期回放某一天 · 点击时间块查看决策依据</div>
+
+<script>
+const DATA = {"meta":{"version":"MeOS 0.1.0-mvp","llm":"mock-policy-v1","vector_backend":"tiny","days":7},"world":{"capacity":0.62,"type_ratio":{"creative":1.32,"deep":1.18,"comms":0.88,"shallow":0.92,"health":1.0},"stuck":{"creative":0.55,"deep":0.26,"comms":0.0,"shallow":0.0,"health":0.0},"collapse_min":95,"collapse_p":0.78,"post_meeting_penalty":1.3},"days":[{"day":1,"metrics":{"planned_focus":630,"done_focus":414,"actual_focus":418,"fulfill_rate":0.657,"hit_rate":0.333,"partial_rate":0.333,"capacity_est":1.0,"capacity_real":0.657,"capacity_error":0.343,"energy_match":0.0,"waste_min":306,"lost_min":90,"switch_count":5,"stuck_predicted":[],"stuck_actual":[],"stuck_hit":1.0,"buffer_ratio":0.1,"max_deep_block":180,"banned_windows":[],"cognition":0.493,"total_tasks":8},"profile":{"capacity_ratio":0.794,"type_ratio":{"shallow":0.983,"health":1.067},"banned_windows":[],"gold_windows":[],"window_fail":{"9":[1],"10":[1],"11":[1],"13":[1],"14":[1],"15":[1],"16":[1],"17":[1],"18":[1],"19":[1]},"window_ok":{"17":1,"18":1,"19":1,"20":1},"max_deep_block":75,"buffer_ratio":0.1,"stuck_hotspots":{"health":0.0,"shallow":0.0,"comms":0.0},"energy_match":0.0,"version":1},"plan":{"rationale":"记忆库还是空的，今天只能按乐观假设排（假设你说到做到）。今天结束后我会学着修正这个假设 —— 这也是你第一次被系统「看清楚」。","capacity":1.0,"buffer":0.1,"maxDeep":180,"prefetch":[],"planned":630,"used":[],"policySource":"mock-policy-v1"},"signal":{"available":720,"meeting":0,"frag":0.35,"high":[["10:00","12:00"],["17:00","18:00"]],"low":[["13:00","16:00"],["21:00","22:00"]],"notes":["自评低能时段：13:00-16:00、21:00-22:00","自评高能时段：10:00-12:00、17:00-18:00"],"energy":{"09:00":3,"10:00":5,"11:00":5,"12:00":3,"13:00":2,"14:00":2,"15:00":2,"16:00":3,"17:00":4,"18:00":3,"19:00":3,"20:00":3,"21:00":2},"backlog":[{"id":"T1-1","title":"竞品分析长文（终稿）","est_min":180,"type":"creative","priority":1,"due":""},{"id":"T1-2","title":"Q3 经营数据分析","est_min":150,"type":"deep","priority":1,"due":""},{"id":"T1-3","title":"Agent 架构方案设计","est_min":120,"type":"deep","priority":1,"due":""},{"id":"T1-4","title":"用户访谈记录整理","est_min":60,"type":"shallow","priority":2,"due":""},{"id":"T1-5","title":"邮件与排期同步","est_min":60,"type":"comms","priority":2,"due":""},{"id":"T1-6","title":"健身","est_min":60,"type":"health","priority":2,"due":""},{"id":"T1-7","title":"周报草稿","est_min":45,"type":"comms","priority":3,"due":""},{"id":"T1-8","title":"行业书籍精读","est_min":45,"type":"shallow","priority":3,"due":""}]},"exec":{"done":414,"actual":414,"lost":90,"switches":5},"timeline":[{"s":"09:00","e":"12:00","kind":"focus","title":"竞品分析长文（终稿）","cost":180,"type":"creative","reason":"高能时段装不下这个长度，退到次优时段","guard":"连续 180 分钟后强制离开工位 10 分钟（来自你的崩塌阈值）","actual":86,"status":"skipped","flag":"collapse","why":"连续深度工作 95 分钟后注意力崩塌，计划 180 分钟只推进了 86 分钟","assist":[]},{"s":"13:00","e":"15:30","kind":"focus","title":"Q3 经营数据分析","cost":150,"type":"deep","reason":"高能时段装不下这个长度，退到次优时段","guard":null,"actual":67,"status":"skipped","flag":"collapse","why":"连续深度工作 95 分钟后注意力崩塌，计划 150 分钟只推进了 86 分钟","assist":[]},{"s":"15:30","e":"15:40","kind":"buffer","title":"切换缓冲","cost":10,"type":"shallow","reason":"你自己的数据：深度块紧接下一个任务时，前 10 分钟基本在走神","guard":null,"actual":0,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"15:40","e":"17:40","kind":"focus","title":"Agent 架构方案设计","cost":120,"type":"deep","reason":"高能时段装不下这个长度，退到次优时段","guard":null,"actual":86,"status":"partial","flag":"collapse","why":"连续深度工作 95 分钟后注意力崩塌，计划 120 分钟只推进了 86 分钟","assist":[]},{"s":"17:40","e":"17:50","kind":"buffer","title":"切换缓冲","cost":10,"type":"shallow","reason":"你自己的数据：深度块紧接下一个任务时，前 10 分钟基本在走神","guard":null,"actual":0,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"17:50","e":"18:50","kind":"focus","title":"用户访谈记录整理","cost":60,"type":"shallow","reason":"常规时段，按优先级顺序填充","guard":null,"actual":59,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"18:50","e":"19:50","kind":"focus","title":"邮件与排期同步","cost":60,"type":"comms","reason":"常规时段，按优先级顺序填充","guard":null,"actual":56,"status":"partial","flag":"ok","why":null,"assist":[]},{"s":"19:50","e":"20:50","kind":"focus","title":"健身","cost":60,"type":"health","reason":"常规时段，按优先级顺序填充","guard":null,"actual":64,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"20:50","e":"21:35","kind":"buffer","title":"弹性缓冲","cost":45,"type":"shallow","reason":"按 10% 缓冲留的机动时间。计划的价值不在于排满，而在于**排不完也不会崩**。","guard":null,"actual":4,"status":"done","flag":"ok","why":"吸收了上一个任务的超时 4 分钟","assist":[]}],"experiences":[{"id":"E1","scene":"计划投入 630 分钟深度工作，实际兑现 414 分钟","decision":"按产能系数 1.00 排的计划","outcome":"真实兑现比例 0.66，与模型信念相差 34%","reflection":"计划一旦超出真实产能，多出来的部分不是被完成，而是变成愧疚感，并且挤压掉后面本来能做完的任务","lesson":"产能系数=0.79 —— 我一天能真正投入的深度工作约为计划的 79%","tags":["capacity","calibration"],"score":0.8},{"id":"E2","scene":"安排了一个 180 分钟的深度块：竞品分析长文（终稿）","decision":"整块不拆，一次做到底","outcome":"连续深度工作 95 分钟后注意力崩塌，计划 180 分钟只推进了 86 分钟","reflection":"你的注意力在阈值之后是断崖式下跌，不是缓慢衰减，所以拆成两段（中间插入切换缓冲）远比硬撑划算","lesson":"深度块上限=75 —— 单个深度块不要超过 75 分钟","tags":["collapse","limit"],"score":0.9}],"recall":{},"log":[{"agent":"感知 Agent","step":"采集 → 结构化信号","detail":"可用 720min / 会议 0min / 碎片化 35% / 待办 8 项"},{"agent":"规划 Agent","step":"检索经验 → 生成计划","detail":"产能系数 1.00 / 缓冲 10% / 深度块上限 180min / 排入 630min"},{"agent":"执行 Agent","step":"执行 → 记录真实结果","detail":"2/6 个深度块完成 / 实际投入 418min / 计划外流失 90min"},{"agent":"复盘 Agent","step":"提炼经验 → 升级画像","detail":"新增 2 条经验 / 画像升级至 v1 （产能系数 0.79，禁用时段 无）"}],"policy_log":"{\"capacity_ratio\": 1.0, \"banned_windows\": [], \"buffer_ratio\": 0.1, \"max_deep_block\": 180, \"prefetch\": [], \"confidence\": 0.68, \"_source\": [\"capacity_ratio\", \"buffer_ratio\", \"max_deep_block\"], \"_note\": \"依据 3 类经验约束调整了策略\"}","exec_detail":"2/6 个深度块完成 / 实际投入 418min / 计划外流失 90min","reflect_detail":"新增 2 条经验 / 画像升级至 v1 （产能系数 0.79，禁用时段 无）"},{"day":2,"metrics":{"planned_focus":512,"done_focus":455,"actual_focus":494,"fulfill_rate":0.889,"hit_rate":0.625,"partial_rate":0.25,"capacity_est":0.79,"capacity_real":0.889,"capacity_error":0.099,"energy_match":0.5,"waste_min":170,"lost_min":113,"switch_count":10,"stuck_predicted":["creative"],"stuck_actual":["creative"],"stuck_hit":1.0,"buffer_ratio":0.1,"max_deep_block":75,"banned_windows":["13:00-15:00"],"cognition":0.795,"total_tasks":8},"profile":{"capacity_ratio":0.827,"type_ratio":{"shallow":0.987,"health":1.067,"deep":1.231,"creative":1.253},"banned_windows":["13:00-15:00"],"gold_windows":["17:00-18:00"],"window_fail":{"9":[1],"10":[1],"11":[1],"13":[1,2],"14":[1,2],"15":[1],"16":[1],"17":[1],"18":[1,2],"19":[1,2]},"window_ok":{"17":3,"18":2,"19":1,"20":1,"9":1,"10":1,"11":1,"14":1,"15":1,"16":1},"max_deep_block":75,"buffer_ratio":0.15,"stuck_hotspots":{"health":0.0,"shallow":0.0,"comms":0.0,"creative":0.5,"deep":0.0},"energy_match":0.0,"version":2},"plan":{"rationale":"今天按 **79% 产能系数** 折算，可投入 568 分钟，留 10% 弹性，最终深度任务排 512 分钟。依据 3 天前那条经验（相似度 0.39）：产能系数=0.79 —— 我一天能真正投入的深度工作约为计划的 79%…","capacity":0.79,"buffer":0.1,"maxDeep":75,"prefetch":[],"planned":512,"used":["E1","E2"],"policySource":"mock-policy-v1"},"signal":{"available":720,"meeting":0,"frag":0.28,"high":[["10:00","12:00"],["17:00","18:00"]],"low":[["13:00","16:00"],["21:00","22:00"]],"notes":["自评低能时段：13:00-16:00、21:00-22:00","自评高能时段：10:00-12:00、17:00-18:00"],"energy":{"09:00":3,"10:00":5,"11:00":5,"12:00":3,"13:00":2,"14:00":2,"15:00":2,"16:00":3,"17:00":4,"18:00":3,"19:00":3,"20:00":3,"21:00":2},"backlog":[{"id":"T2-1","title":"长文写作（第二稿）","est_min":150,"type":"creative","priority":1,"due":""},{"id":"T2-2","title":"数据看板搭建","est_min":120,"type":"shallow","priority":1,"due":""},{"id":"T2-3","title":"竞品定价调研","est_min":90,"type":"deep","priority":1,"due":""},{"id":"T2-4","title":"需求评审文档","est_min":60,"type":"shallow","priority":2,"due":""},{"id":"T2-5","title":"邮件与排期同步","est_min":60,"type":"comms","priority":2,"due":""},{"id":"T2-6","title":"客户案例整理","est_min":75,"type":"shallow","priority":2,"due":""},{"id":"T2-7","title":"健身","est_min":60,"type":"health","priority":2,"due":""},{"id":"T2-8","title":"行业书籍精读","est_min":60,"type":"shallow","priority":3,"due":""}]},"exec":{"done":455,"actual":455,"lost":113,"switches":10},"timeline":[{"s":"09:00","e":"09:45","kind":"focus","title":"竞品定价调研","cost":45,"type":"deep","reason":"高能时段装不下这个长度，退到次优时段","guard":null,"actual":56,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"09:45","e":"09:55","kind":"buffer","title":"切换缓冲","cost":10,"type":"shallow","reason":"你自己的数据：深度块紧接下一个任务时，前 10 分钟基本在走神","guard":null,"actual":10,"status":"done","flag":"ok","why":"吸收了上一个任务的超时 10 分钟","assist":[]},{"s":"10:00","e":"11:15","kind":"focus","title":"长文写作（第二稿）","cost":75,"type":"creative","reason":"排在你的高能时段 10:00-12:00","guard":"连续 75 分钟后强制离开工位 10 分钟（来自你的崩塌阈值）","actual":94,"status":"done","flag":"carry","why":"上一个任务超时，本块实际只剩 74 分钟可用","assist":[]},{"s":"11:15","e":"11:25","kind":"buffer","title":"切换缓冲","cost":10,"type":"shallow","reason":"你自己的数据：深度块紧接下一个任务时，前 10 分钟基本在走神","guard":null,"actual":10,"status":"done","flag":"ok","why":"吸收了上一个任务的超时 10 分钟","assist":[]},{"s":"11:25","e":"11:57","kind":"focus","title":"客户案例整理","cost":32,"type":"shallow","reason":"排在你的高能时段 10:00-12:00","guard":null,"actual":22,"status":"partial","flag":"carry","why":"上一个任务超时，本块实际只剩 23 分钟可用","assist":[]},{"s":"13:00","e":"14:15","kind":"focus","title":"长文写作（第二稿）","cost":75,"type":"creative","reason":"高能时段装不下这个长度，退到次优时段","guard":"连续 75 分钟后强制离开工位 10 分钟（来自你的崩塌阈值）","actual":33,"status":"skipped","flag":"stuck","why":"在「综述/开篇」环节反复重写，缺少可参考的骨架","assist":[]},{"s":"14:15","e":"14:25","kind":"buffer","title":"切换缓冲","cost":10,"type":"shallow","reason":"你自己的数据：深度块紧接下一个任务时，前 10 分钟基本在走神","guard":null,"actual":0,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"14:25","e":"16:25","kind":"focus","title":"数据看板搭建","cost":120,"type":"shallow","reason":"常规时段，按优先级顺序填充","guard":null,"actual":120,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"16:25","e":"16:45","kind":"buffer","title":"弹性缓冲","cost":20,"type":"shallow","reason":"按 10% 缓冲留的机动时间。计划的价值不在于排满，而在于**排不完也不会崩**。","guard":null,"actual":0,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"17:00","e":"17:45","kind":"focus","title":"竞品定价调研","cost":45,"type":"deep","reason":"排在你的高能时段 17:00-18:00","guard":null,"actual":54,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"17:45","e":"17:55","kind":"buffer","title":"切换缓冲","cost":10,"type":"shallow","reason":"你自己的数据：深度块紧接下一个任务时，前 10 分钟基本在走神","guard":null,"actual":9,"status":"done","flag":"ok","why":"吸收了上一个任务的超时 9 分钟","assist":[]},{"s":"17:55","e":"18:55","kind":"focus","title":"需求评审文档","cost":60,"type":"shallow","reason":"常规时段，按优先级顺序填充","guard":null,"actual":59,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"18:55","e":"19:55","kind":"focus","title":"邮件与排期同步","cost":60,"type":"comms","reason":"常规时段，按优先级顺序填充","guard":null,"actual":56,"status":"partial","flag":"ok","why":null,"assist":[]}],"experiences":[{"id":"E11","scene":"13:00-15:00 已被安排在深度任务里，且你的精力自评长期处于低值","decision":"按时段顺序填充任务，没有区分时段质量","outcome":"该时段在 2 个不同的日子都失手","reflection":"不是你不想做，是这个时段生理状态不支持深度认知。硬排只会制造失败记录，然后把失败归因成'我不行'","lesson":"禁排窗口=13:00-15:00 —— 这个时段不要安排深度工作，留给机械性事务","tags":["window","energy"],"score":0.85},{"id":"E12","scene":"执行「creative」类任务反复受阻","decision":"按时开始，没有提前准备材料","outcome":"在同一个环节反复重写 / 回退 / 重新确认","reflection":"这类任务的卡点是结构性的，不是状态问题 —— 提前给一份骨架，比催你'集中注意力'有效得多","lesson":"卡点=creative —— 遇到这类任务提前准备辅助材料","tags":["stuck","creative"],"score":0.8},{"id":"E13","scene":"当天计划外流失 113 分钟","decision":"预留了 10% 的缓冲","outcome":"缓冲被真实需求吃掉了","reflection":"缓冲不是浪费，是让计划具备抗打扰能力的保险费。没有缓冲的计划，一次意外就整体崩塌","lesson":"缓冲比例=0.15 —— 计划里预留 15% 的机动时间","tags":["buffer","resilience"],"score":0.65}],"recall":{"day":2,"scene":"第2天 可用720分钟 会议0分钟 碎片化0.28 待办类型comms/creative/deep/health/shallow 高能时段[['10:00', '12:00'], ['17:00', '18:00']]","hits":[{"id":"E1","sim":0.392,"rerank":0.585,"lesson":"产能系数=0.79 —— 我一天能真正投入的深度工作约为计划的 79%"},{"id":"E2","sim":0.279,"rerank":0.543,"lesson":"深度块上限=75 —— 单个深度块不要超过 75 分钟"}]},"log":[{"agent":"感知 Agent","step":"采集 → 结构化信号","detail":"可用 720min / 会议 0min / 碎片化 28% / 待办 8 项"},{"agent":"规划 Agent","step":"检索经验 → 生成计划","detail":"产能系数 0.79 / 缓冲 10% / 深度块上限 75min / 排入 512min"},{"agent":"执行 Agent","step":"执行 → 记录真实结果","detail":"5/8 个深度块完成 / 实际投入 494min / 计划外流失 113min"},{"agent":"复盘 Agent","step":"提炼经验 → 升级画像","detail":"新增 3 条经验 / 画像升级至 v2 （产能系数 0.83，禁用时段 13:00-15:00）"}],"policy_log":"{\"capacity_ratio\": 0.79, \"banned_windows\": [], \"buffer_ratio\": 0.1, \"max_deep_block\": 75, \"prefetch\": [], \"confidence\": 0.68, \"_source\": [\"capacity_ratio\", \"buffer_ratio\", \"max_deep_block\"], \"_note\": \"依据 3 类经验约束调整了策略\"}","exec_detail":"5/8 个深度块完成 / 实际投入 494min / 计划外流失 113min","reflect_detail":"新增 3 条经验 / 画像升级至 v2 （产能系数 0.83，禁用时段 13:00-15:00）"},{"day":3,"metrics":{"planned_focus":315,"done_focus":233,"actual_focus":388,"fulfill_rate":0.74,"hit_rate":0.6,"partial_rate":0.0,"capacity_est":0.83,"capacity_real":0.74,"capacity_error":0.09,"energy_match":0.2,"waste_min":175,"lost_min":93,"switch_count":7,"stuck_predicted":["creative"],"stuck_actual":["creative","deep"],"stuck_hit":0.5,"buffer_ratio":0.15,"max_deep_block":75,"banned_windows":["13:00-16:00"],"cognition":0.656,"total_tasks":8},"profile":{"capacity_ratio":0.796,"type_ratio":{"shallow":0.987,"health":1.067,"deep":1.536,"creative":1.441},"banned_windows":["13:00-16:00"],"gold_windows":["17:00-18:00"],"window_fail":{"9":[1],"10":[1],"11":[1,3],"13":[1,2],"14":[1,2],"15":[1,3],"16":[1],"17":[1,3],"18":[1,2,3],"19":[1,2,3]},"window_ok":{"17":3,"18":2,"19":1,"20":1,"9":2,"10":1,"11":1,"14":1,"15":1,"16":1},"max_deep_block":75,"buffer_ratio":0.2,"stuck_hotspots":{"health":0.0,"shallow":0.0,"comms":0.0,"creative":0.68,"deep":0.12},"energy_match":0.0,"version":3},"plan":{"rationale":"今天按 **83% 产能系数** 折算，可投入 398 分钟，留 15% 弹性，最终深度任务排 315 分钟。依据 3 天前那条经验（相似度 0.45）：禁排窗口=13:00-15:00 —— 这个时段不要安排深度工作，留给机械性事务…","capacity":0.83,"buffer":0.15,"maxDeep":75,"prefetch":["creative"],"planned":315,"used":["E11","E12","E1"],"policySource":"mock-policy-v1"},"signal":{"available":600,"meeting":120,"frag":0.47,"high":[["11:00","12:00"],["17:00","18:00"]],"low":[["13:00","16:00"],["21:00","22:00"]],"notes":["自评低能时段：13:00-16:00、21:00-22:00","自评高能时段：11:00-12:00、17:00-18:00","固定占用：周会 10:00（60min）","固定占用：项目对齐会 16:00（60min）"],"energy":{"09:00":3,"10:00":3,"11:00":5,"12:00":3,"13:00":2,"14:00":2,"15:00":2,"16:00":3,"17:00":4,"18:00":3,"19:00":3,"20:00":3,"21:00":2},"backlog":[{"id":"T3-1","title":"长文写作（第三稿）","est_min":150,"type":"creative","priority":1,"due":""},{"id":"T3-2","title":"留存漏斗数据分析","est_min":120,"type":"deep","priority":1,"due":""},{"id":"T3-3","title":"Agent 架构方案设计","est_min":90,"type":"deep","priority":1,"due":""},{"id":"T3-4","title":"会议纪要整理","est_min":45,"type":"shallow","priority":2,"due":""},{"id":"T3-5","title":"邮件与排期同步","est_min":45,"type":"comms","priority":2,"due":""},{"id":"T3-6","title":"健身","est_min":60,"type":"health","priority":2,"due":""},{"id":"T3-7","title":"行业书籍精读","est_min":45,"type":"shallow","priority":3,"due":""},{"id":"T3-8","title":"报销与报销单","est_min":30,"type":"shallow","priority":3,"due":""}]},"exec":{"done":233,"actual":233,"lost":93,"switches":7},"timeline":[{"s":"09:00","e":"10:00","kind":"focus","title":"留存漏斗数据分析","cost":60,"type":"deep","reason":"高能时段装不下这个长度，退到次优时段","guard":null,"actual":75,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"11:00","e":"12:00","kind":"focus","title":"留存漏斗数据分析","cost":60,"type":"deep","reason":"排在你的高能时段 11:00-12:00","guard":null,"actual":134,"status":"done","flag":"stuck","why":"卡在数据口径对齐，反复回到起点确认定义","assist":[]},{"s":"13:00","e":"15:00","kind":"recovery","title":"主动留白（低能时段）","cost":120,"type":"shallow","reason":"这条来自记忆：13:00-15:00 的历史完成率极低，排了也是浪费。与其自责，不如直接承认它不存在。","guard":"此段不排任何深度任务","actual":120,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"15:00","e":"15:45","kind":"focus","title":"Agent 架构方案设计","cost":45,"type":"deep","reason":"高能时段装不下这个长度，退到次优时段","guard":null,"actual":9,"status":"skipped","flag":"energy","why":"15:00 是你的低能时段，结果是坐着但没产出","assist":[]},{"s":"15:45","e":"15:55","kind":"buffer","title":"切换缓冲","cost":10,"type":"shallow","reason":"你自己的数据：深度块紧接下一个任务时，前 10 分钟基本在走神","guard":null,"actual":0,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"17:00","e":"18:15","kind":"focus","title":"长文写作（第三稿）","cost":75,"type":"creative","reason":"高能时段装不下这个长度，退到次优时段","guard":"连续 75 分钟后强制离开工位 10 分钟（来自你的崩塌阈值）","actual":141,"status":"done","flag":"stuck","why":"卡点已被提前准备的辅助材料化解","assist":["3 篇同类范文的结构骨架 + 你上次那篇被夸的提纲","3 篇同类范文的结构骨架 + 你上次那篇被夸的提纲"]},{"s":"18:15","e":"18:25","kind":"buffer","title":"切换缓冲","cost":10,"type":"shallow","reason":"你自己的数据：深度块紧接下一个任务时，前 10 分钟基本在走神","guard":null,"actual":10,"status":"done","flag":"ok","why":"吸收了上一个任务的超时 10 分钟","assist":[]},{"s":"18:25","e":"19:40","kind":"focus","title":"长文写作（第三稿）","cost":75,"type":"creative","reason":"高能时段装不下这个长度，退到次优时段","guard":"连续 75 分钟后强制离开工位 10 分钟（来自你的崩塌阈值）","actual":29,"status":"skipped","flag":"stuck","why":"卡点已被提前准备的辅助材料化解","assist":["3 篇同类范文的结构骨架 + 你上次那篇被夸的提纲","3 篇同类范文的结构骨架 + 你上次那篇被夸的提纲"]},{"s":"19:40","e":"19:50","kind":"buffer","title":"切换缓冲","cost":10,"type":"shallow","reason":"你自己的数据：深度块紧接下一个任务时，前 10 分钟基本在走神","guard":null,"actual":0,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"19:50","e":"20:19","kind":"buffer","title":"弹性缓冲","cost":29,"type":"shallow","reason":"按 15% 缓冲留的机动时间。计划的价值不在于排满，而在于**排不完也不会崩**。","guard":null,"actual":0,"status":"done","flag":"ok","why":null,"assist":[]}],"experiences":[{"id":"E21","scene":"13:00-16:00 已被安排在深度任务里，且你的精力自评长期处于低值","decision":"按时段顺序填充任务，没有区分时段质量","outcome":"该时段在 2 个不同的日子都失手","reflection":"不是你不想做，是这个时段生理状态不支持深度认知。硬排只会制造失败记录，然后把失败归因成'我不行'","lesson":"禁排窗口=13:00-16:00 —— 这个时段不要安排深度工作，留给机械性事务","tags":["window","energy"],"score":0.85},{"id":"E22","scene":"当天计划外流失 93 分钟","decision":"预留了 15% 的缓冲","outcome":"缓冲被真实需求吃掉了","reflection":"缓冲不是浪费，是让计划具备抗打扰能力的保险费。没有缓冲的计划，一次意外就整体崩塌","lesson":"缓冲比例=0.20 —— 计划里预留 20% 的机动时间","tags":["buffer","resilience"],"score":0.65}],"recall":{"day":3,"scene":"第3天 可用600分钟 会议120分钟 碎片化0.47 待办类型comms/creative/deep/health/shallow 高能时段[['11:00', '12:00'], ['17:00', '18:00']]","hits":[{"id":"E11","sim":0.449,"rerank":0.632,"lesson":"禁排窗口=13:00-15:00 —— 这个时段不要安排深度工作，留给机械性事务"},{"id":"E12","sim":0.383,"rerank":0.58,"lesson":"卡点=creative —— 遇到这类任务提前准备辅助材料"},{"id":"E1","sim":0.379,"rerank":0.502,"lesson":"产能系数=0.79 —— 我一天能真正投入的深度工作约为计划的 79%"}]},"log":[{"agent":"感知 Agent","step":"采集 → 结构化信号","detail":"可用 600min / 会议 120min / 碎片化 47% / 待办 8 项"},{"agent":"规划 Agent","step":"检索经验 → 生成计划","detail":"产能系数 0.83 / 缓冲 15% / 深度块上限 75min / 排入 315min"},{"agent":"执行 Agent","step":"执行 → 记录真实结果","detail":"3/5 个深度块完成 / 实际投入 388min / 计划外流失 93min"},{"agent":"复盘 Agent","step":"提炼经验 → 升级画像","detail":"新增 2 条经验 / 画像升级至 v3 （产能系数 0.80，禁用时段 13:00-16:00）"}],"policy_log":"{\"capacity_ratio\": 0.83, \"banned_windows\": [\"13:00-15:00\"], \"buffer_ratio\": 0.15, \"max_deep_block\": 75, \"prefetch\": [\"creative\"], \"confidence\": 1.0, \"_source\": [\"capacity_ratio\", \"buffer_ratio\", \"max_deep_block\", \"banned_windows\", \"prefetch\"], \"_note\": \"依据 5 类经验约束调整了策略\"}","exec_detail":"3/5 个深度块完成 / 实际投入 388min / 计划外流失 93min","reflect_detail":"新增 2 条经验 / 画像升级至 v3 （产能系数 0.80，禁用时段 13:00-16:00）"},{"day":4,"metrics":{"planned_focus":346,"done_focus":287,"actual_focus":335,"fulfill_rate":0.829,"hit_rate":0.571,"partial_rate":0.143,"capacity_est":0.8,"capacity_real":0.829,"capacity_error":0.029,"energy_match":0.5,"waste_min":196,"lost_min":137,"switch_count":13,"stuck_predicted":["creative"],"stuck_actual":["creative","deep"],"stuck_hit":0.5,"buffer_ratio":0.2,"max_deep_block":75,"banned_windows":["18:00-20:00"],"cognition":0.789,"total_tasks":8},"profile":{"capacity_ratio":0.808,"type_ratio":{"shallow":0.984,"health":1.067,"deep":1.536,"creative":1.281},"banned_windows":["18:00-20:00"],"gold_windows":["17:00-18:00"],"window_fail":{"9":[1,4],"10":[1,4],"11":[1,3],"13":[1,2],"14":[1,2],"15":[1,3],"16":[1,4],"17":[1,3,4],"18":[1,2,3],"19":[1,2,3]},"window_ok":{"17":3,"18":3,"19":2,"20":1,"9":2,"10":1,"11":1,"14":1,"15":1,"16":1},"max_deep_block":75,"buffer_ratio":0.25,"stuck_hotspots":{"health":0.0,"shallow":0.0,"comms":0.0,"creative":0.62,"deep":0.25},"energy_match":0.0,"version":4},"plan":{"rationale":"今天按 **80% 产能系数** 折算，可投入 432 分钟，留 20% 弹性，最终深度任务排 346 分钟。依据 3 天前那条经验（相似度 0.41）：禁排窗口=13:00-16:00 —— 这个时段不要安排深度工作，留给机械性事务…","capacity":0.8,"buffer":0.2,"maxDeep":75,"prefetch":["creative"],"planned":346,"used":["E21","E11","E12"],"policySource":"mock-policy-v1"},"signal":{"available":720,"meeting":0,"frag":0.33,"high":[["10:00","12:00"]],"low":[["09:00","10:00"],["12:00","17:00"],["18:00","22:00"]],"notes":["自评低能时段：09:00-10:00、12:00-17:00、18:00-22:00","自评高能时段：10:00-12:00"],"energy":{"09:00":2,"10:00":4,"11:00":4,"12:00":2,"13:00":1,"14:00":1,"15:00":1,"16:00":2,"17:00":3,"18:00":2,"19:00":2,"20:00":2,"21:00":1},"backlog":[{"id":"T4-1","title":"长文写作（第四稿）","est_min":120,"type":"creative","priority":1,"due":""},{"id":"T4-2","title":"Agent 架构方案定稿","est_min":90,"type":"deep","priority":1,"due":""},{"id":"T4-3","title":"数据复盘报告","est_min":90,"type":"creative","priority":1,"due":""},{"id":"T4-4","title":"需求评审文档","est_min":75,"type":"shallow","priority":2,"due":""},{"id":"T4-5","title":"邮件与排期同步","est_min":60,"type":"comms","priority":2,"due":""},{"id":"T4-6","title":"健身","est_min":45,"type":"health","priority":2,"due":""},{"id":"T4-7","title":"行业书籍精读","est_min":60,"type":"shallow","priority":3,"due":""},{"id":"T4-8","title":"周报草稿","est_min":60,"type":"comms","priority":3,"due":""}]},"exec":{"done":287,"actual":287,"lost":137,"switches":13},"timeline":[{"s":"09:00","e":"09:45","kind":"focus","title":"Agent 架构方案定稿","cost":45,"type":"deep","reason":"高能时段装不下这个长度，退到次优时段","guard":null,"actual":20,"status":"skipped","flag":"stuck","why":"卡在数据口径对齐，反复回到起点确认定义","assist":[]},{"s":"09:45","e":"09:55","kind":"buffer","title":"切换缓冲","cost":10,"type":"shallow","reason":"你自己的数据：深度块紧接下一个任务时，前 10 分钟基本在走神","guard":null,"actual":0,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"10:00","e":"11:00","kind":"focus","title":"长文写作（第四稿）","cost":60,"type":"creative","reason":"排在你的高能时段 10:00-12:00","guard":null,"actual":84,"status":"done","flag":"stuck","why":"卡点已被提前准备的辅助材料化解","assist":["3 篇同类范文的结构骨架 + 你上次那篇被夸的提纲","3 篇同类范文的结构骨架 + 你上次那篇被夸的提纲"]},{"s":"11:00","e":"11:10","kind":"buffer","title":"切换缓冲","cost":10,"type":"shallow","reason":"你自己的数据：深度块紧接下一个任务时，前 10 分钟基本在走神","guard":null,"actual":10,"status":"done","flag":"ok","why":"吸收了上一个任务的超时 10 分钟","assist":[]},{"s":"11:10","e":"11:55","kind":"focus","title":"Agent 架构方案定稿","cost":45,"type":"deep","reason":"排在你的高能时段 10:00-12:00","guard":null,"actual":39,"status":"partial","flag":"carry","why":"上一个任务超时，本块实际只剩 31 分钟可用","assist":[]},{"s":"13:00","e":"16:00","kind":"recovery","title":"主动留白（低能时段）","cost":180,"type":"shallow","reason":"这条来自记忆：13:00-16:00 的历史完成率极低，排了也是浪费。与其自责，不如直接承认它不存在。","guard":"此段不排任何深度任务","actual":180,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"16:00","e":"16:45","kind":"focus","title":"数据复盘报告","cost":45,"type":"creative","reason":"高能时段装不下这个长度，退到次优时段","guard":null,"actual":20,"status":"skipped","flag":"stuck","why":"卡点已被提前准备的辅助材料化解","assist":["3 篇同类范文的结构骨架 + 你上次那篇被夸的提纲","3 篇同类范文的结构骨架 + 你上次那篇被夸的提纲"]},{"s":"16:45","e":"16:55","kind":"buffer","title":"切换缓冲","cost":10,"type":"shallow","reason":"你自己的数据：深度块紧接下一个任务时，前 10 分钟基本在走神","guard":null,"actual":0,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"17:00","e":"18:00","kind":"focus","title":"长文写作（第四稿）","cost":60,"type":"creative","reason":"排在你的高能时段 17:00-18:00","guard":null,"actual":84,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"18:00","e":"18:10","kind":"buffer","title":"切换缓冲","cost":10,"type":"shallow","reason":"你自己的数据：深度块紧接下一个任务时，前 10 分钟基本在走神","guard":null,"actual":10,"status":"done","flag":"ok","why":"吸收了上一个任务的超时 10 分钟","assist":[]},{"s":"18:10","e":"18:55","kind":"focus","title":"数据复盘报告","cost":45,"type":"creative","reason":"高能时段装不下这个长度，退到次优时段","guard":null,"actual":43,"status":"done","flag":"carry","why":"上一个任务超时，本块实际只剩 31 分钟可用","assist":[]},{"s":"18:55","e":"19:05","kind":"buffer","title":"切换缓冲","cost":10,"type":"shallow","reason":"你自己的数据：深度块紧接下一个任务时，前 10 分钟基本在走神","guard":null,"actual":0,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"19:05","e":"19:51","kind":"focus","title":"需求评审文档","cost":46,"type":"shallow","reason":"常规时段，按优先级顺序填充","guard":null,"actual":45,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"19:51","e":"20:27","kind":"buffer","title":"弹性缓冲","cost":36,"type":"shallow","reason":"按 20% 缓冲留的机动时间。计划的价值不在于排满，而在于**排不完也不会崩**。","guard":null,"actual":0,"status":"done","flag":"ok","why":null,"assist":[]}],"experiences":[{"id":"E31","scene":"18:00-20:00 已被安排在深度任务里，且你的精力自评长期处于低值","decision":"按时段顺序填充任务，没有区分时段质量","outcome":"该时段在 3 个不同的日子都失手","reflection":"不是你不想做，是这个时段生理状态不支持深度认知。硬排只会制造失败记录，然后把失败归因成'我不行'","lesson":"禁排窗口=18:00-20:00 —— 这个时段不要安排深度工作，留给机械性事务","tags":["window","energy"],"score":0.85},{"id":"E32","scene":"当天计划外流失 137 分钟","decision":"预留了 20% 的缓冲","outcome":"缓冲被真实需求吃掉了","reflection":"缓冲不是浪费，是让计划具备抗打扰能力的保险费。没有缓冲的计划，一次意外就整体崩塌","lesson":"缓冲比例=0.25 —— 计划里预留 25% 的机动时间","tags":["buffer","resilience"],"score":0.65}],"recall":{"day":4,"scene":"第4天 可用720分钟 会议0分钟 碎片化0.33 待办类型comms/creative/deep/health/shallow 高能时段[['10:00', '12:00']]","hits":[{"id":"E21","sim":0.413,"rerank":0.61,"lesson":"禁排窗口=13:00-16:00 —— 这个时段不要安排深度工作，留给机械性事务"},{"id":"E11","sim":0.379,"rerank":0.54,"lesson":"禁排窗口=13:00-15:00 —— 这个时段不要安排深度工作，留给机械性事务"},{"id":"E12","sim":0.376,"rerank":0.526,"lesson":"卡点=creative —— 遇到这类任务提前准备辅助材料"}]},"log":[{"agent":"感知 Agent","step":"采集 → 结构化信号","detail":"可用 720min / 会议 0min / 碎片化 33% / 待办 8 项"},{"agent":"规划 Agent","step":"检索经验 → 生成计划","detail":"产能系数 0.80 / 缓冲 20% / 深度块上限 75min / 排入 346min"},{"agent":"执行 Agent","step":"执行 → 记录真实结果","detail":"4/7 个深度块完成 / 实际投入 335min / 计划外流失 137min"},{"agent":"复盘 Agent","step":"提炼经验 → 升级画像","detail":"新增 2 条经验 / 画像升级至 v4 （产能系数 0.81，禁用时段 18:00-20:00）"}],"policy_log":"{\"capacity_ratio\": 0.8, \"banned_windows\": [\"13:00-16:00\"], \"buffer_ratio\": 0.2, \"max_deep_block\": 75, \"prefetch\": [\"creative\"], \"confidence\": 1.0, \"_source\": [\"capacity_ratio\", \"buffer_ratio\", \"max_deep_block\", \"banned_windows\", \"prefetch\"], \"_note\": \"依据 5 类经验约束调整了策略\"}","exec_detail":"4/7 个深度块完成 / 实际投入 335min / 计划外流失 137min","reflect_detail":"新增 2 条经验 / 画像升级至 v4 （产能系数 0.81，禁用时段 18:00-20:00）"},{"day":5,"metrics":{"planned_focus":315,"done_focus":295,"actual_focus":422,"fulfill_rate":0.937,"hit_rate":0.833,"partial_rate":0.167,"capacity_est":0.81,"capacity_real":0.937,"capacity_error":0.127,"energy_match":0.5,"waste_min":113,"lost_min":93,"switch_count":7,"stuck_predicted":["creative"],"stuck_actual":["creative","deep"],"stuck_hit":0.5,"buffer_ratio":0.25,"max_deep_block":75,"banned_windows":["13:00-16:00"],"cognition":0.808,"total_tasks":7},"profile":{"capacity_ratio":0.853,"type_ratio":{"shallow":0.984,"health":1.067,"deep":1.697,"creative":1.272},"banned_windows":["13:00-16:00"],"gold_windows":["10:00-12:00","17:00-18:00"],"window_fail":{"9":[1,4],"10":[1,4],"11":[1,3],"13":[1,2],"14":[1,2],"15":[1,3,5],"16":[1,4],"17":[1,3,4,5],"18":[1,2,3],"19":[1,2,3]},"window_ok":{"17":3,"18":3,"19":2,"20":1,"9":3,"10":2,"11":2,"14":1,"15":1,"16":1,"13":1},"max_deep_block":75,"buffer_ratio":0.3,"stuck_hotspots":{"health":0.0,"shallow":0.0,"comms":0.0,"creative":0.58,"deep":0.25},"energy_match":0.0,"version":5},"plan":{"rationale":"今天按 **81% 产能系数** 折算，可投入 437 分钟，留 25% 弹性，最终深度任务排 315 分钟。依据 3 天前那条经验（相似度 0.44）：禁排窗口=18:00-20:00 —— 这个时段不要安排深度工作，留给机械性事务…","capacity":0.81,"buffer":0.25,"maxDeep":75,"prefetch":["creative"],"planned":315,"used":["E31","E21","E11"],"policySource":"mock-policy-v1"},"signal":{"available":660,"meeting":60,"frag":0.33,"high":[["10:00","12:00"],["17:00","18:00"]],"low":[["13:00","16:00"],["21:00","22:00"]],"notes":["自评低能时段：13:00-16:00、21:00-22:00","自评高能时段：10:00-12:00、17:00-18:00","固定占用：客户沟通会 14:00（60min）"],"energy":{"09:00":3,"10:00":5,"11:00":5,"12:00":3,"13:00":2,"14:00":1,"15:00":2,"16:00":3,"17:00":4,"18:00":3,"19:00":3,"20:00":3,"21:00":2},"backlog":[{"id":"T5-1","title":"长文修改（终稿）","est_min":120,"type":"creative","priority":1,"due":""},{"id":"T5-2","title":"Agent 架构方案定稿","est_min":90,"type":"deep","priority":1,"due":""},{"id":"T5-3","title":"留存漏斗数据分析","est_min":105,"type":"deep","priority":1,"due":""},{"id":"T5-4","title":"客户案例整理","est_min":60,"type":"shallow","priority":2,"due":""},{"id":"T5-5","title":"邮件与排期同步","est_min":45,"type":"comms","priority":2,"due":""},{"id":"T5-6","title":"行业书籍精读","est_min":45,"type":"shallow","priority":3,"due":""},{"id":"T5-7","title":"健身","est_min":60,"type":"health","priority":2,"due":""}]},"exec":{"done":295,"actual":295,"lost":93,"switches":7},"timeline":[{"s":"09:00","e":"09:45","kind":"focus","title":"Agent 架构方案定稿","cost":45,"type":"deep","reason":"高能时段装不下这个长度，退到次优时段","guard":null,"actual":56,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"09:45","e":"09:55","kind":"buffer","title":"切换缓冲","cost":10,"type":"shallow","reason":"你自己的数据：深度块紧接下一个任务时，前 10 分钟基本在走神","guard":null,"actual":10,"status":"done","flag":"ok","why":"吸收了上一个任务的超时 10 分钟","assist":[]},{"s":"10:00","e":"11:00","kind":"focus","title":"长文修改（终稿）","cost":60,"type":"creative","reason":"排在你的高能时段 10:00-12:00","guard":null,"actual":75,"status":"done","flag":"carry","why":"上一个任务超时，本块实际只剩 59 分钟可用","assist":[]},{"s":"11:00","e":"11:10","kind":"buffer","title":"切换缓冲","cost":10,"type":"shallow","reason":"你自己的数据：深度块紧接下一个任务时，前 10 分钟基本在走神","guard":null,"actual":10,"status":"done","flag":"ok","why":"吸收了上一个任务的超时 10 分钟","assist":[]},{"s":"11:10","e":"11:55","kind":"focus","title":"Agent 架构方案定稿","cost":45,"type":"deep","reason":"排在你的高能时段 10:00-12:00","guard":null,"actual":50,"status":"done","flag":"carry","why":"上一个任务超时，本块实际只剩 40 分钟可用","assist":[]},{"s":"13:00","e":"13:52","kind":"focus","title":"留存漏斗数据分析","cost":52,"type":"deep","reason":"高能时段装不下这个长度，退到次优时段","guard":null,"actual":62,"status":"done","flag":"carry","why":"上一个任务超时，本块实际只剩 47 分钟可用","assist":[]},{"s":"15:00","e":"15:53","kind":"focus","title":"留存漏斗数据分析","cost":53,"type":"deep","reason":"高能时段装不下这个长度，退到次优时段","guard":null,"actual":139,"status":"done","flag":"stuck","why":"卡在数据口径对齐，反复回到起点确认定义","assist":[]},{"s":"15:53","e":"16:03","kind":"buffer","title":"切换缓冲","cost":10,"type":"shallow","reason":"你自己的数据：深度块紧接下一个任务时，前 10 分钟基本在走神","guard":null,"actual":10,"status":"done","flag":"ok","why":"吸收了上一个任务的超时 10 分钟","assist":[]},{"s":"16:03","e":"16:48","kind":"buffer","title":"弹性缓冲","cost":45,"type":"shallow","reason":"按 25% 缓冲留的机动时间。计划的价值不在于排满，而在于**排不完也不会崩**。","guard":null,"actual":45,"status":"done","flag":"ok","why":"吸收了上一个任务的超时 45 分钟","assist":[]},{"s":"17:00","e":"18:00","kind":"focus","title":"长文修改（终稿）","cost":60,"type":"creative","reason":"排在你的高能时段 17:00-18:00、17:00-18:00","guard":null,"actual":40,"status":"partial","flag":"stuck","why":"卡点已被提前准备的辅助材料化解","assist":["3 篇同类范文的结构骨架 + 你上次那篇被夸的提纲","3 篇同类范文的结构骨架 + 你上次那篇被夸的提纲"]},{"s":"18:00","e":"20:00","kind":"recovery","title":"主动留白（低能时段）","cost":120,"type":"shallow","reason":"这条来自记忆：18:00-20:00 的历史完成率极低，排了也是浪费。与其自责，不如直接承认它不存在。","guard":"此段不排任何深度任务","actual":120,"status":"done","flag":"ok","why":null,"assist":[]}],"experiences":[{"id":"E41","scene":"计划投入 315 分钟深度工作，实际兑现 295 分钟","decision":"按产能系数 0.81 排的计划","outcome":"真实兑现比例 0.94，与模型信念相差 13%","reflection":"实际产能高于模型估计，模型偏保守了，可以适度放开","lesson":"产能系数=0.85 —— 我一天能真正投入的深度工作约为计划的 85%","tags":["capacity","calibration"],"score":0.6},{"id":"E42","scene":"13:00-16:00 已被安排在深度任务里，且你的精力自评长期处于低值","decision":"按时段顺序填充任务，没有区分时段质量","outcome":"该时段在 3 个不同的日子都失手","reflection":"不是你不想做，是这个时段生理状态不支持深度认知。硬排只会制造失败记录，然后把失败归因成'我不行'","lesson":"禁排窗口=13:00-16:00 —— 这个时段不要安排深度工作，留给机械性事务","tags":["window","energy"],"score":0.85},{"id":"E43","scene":"当天计划外流失 93 分钟","decision":"预留了 25% 的缓冲","outcome":"缓冲被真实需求吃掉了","reflection":"缓冲不是浪费，是让计划具备抗打扰能力的保险费。没有缓冲的计划，一次意外就整体崩塌","lesson":"缓冲比例=0.30 —— 计划里预留 30% 的机动时间","tags":["buffer","resilience"],"score":0.65}],"recall":{"day":5,"scene":"第5天 可用660分钟 会议60分钟 碎片化0.33 待办类型comms/creative/deep/health/shallow 高能时段[['10:00', '12:00'], ['17:00', '18:00']]","hits":[{"id":"E31","sim":0.44,"rerank":0.626,"lesson":"禁排窗口=18:00-20:00 —— 这个时段不要安排深度工作，留给机械性事务"},{"id":"E21","sim":0.453,"rerank":0.597,"lesson":"禁排窗口=13:00-16:00 —— 这个时段不要安排深度工作，留给机械性事务"},{"id":"E11","sim":0.422,"rerank":0.54,"lesson":"禁排窗口=13:00-15:00 —— 这个时段不要安排深度工作，留给机械性事务"}]},"log":[{"agent":"感知 Agent","step":"采集 → 结构化信号","detail":"可用 660min / 会议 60min / 碎片化 33% / 待办 7 项"},{"agent":"规划 Agent","step":"检索经验 → 生成计划","detail":"产能系数 0.81 / 缓冲 25% / 深度块上限 75min / 排入 315min"},{"agent":"执行 Agent","step":"执行 → 记录真实结果","detail":"5/6 个深度块完成 / 实际投入 422min / 计划外流失 93min"},{"agent":"复盘 Agent","step":"提炼经验 → 升级画像","detail":"新增 3 条经验 / 画像升级至 v5 （产能系数 0.85，禁用时段 13:00-16:00）"}],"policy_log":"{\"capacity_ratio\": 0.81, \"banned_windows\": [\"18:00-20:00\"], \"buffer_ratio\": 0.25, \"max_deep_block\": 75, \"prefetch\": [\"creative\"], \"confidence\": 1.0, \"_source\": [\"capacity_ratio\", \"buffer_ratio\", \"max_deep_block\", \"banned_windows\", \"prefetch\"], \"_note\": \"依据 5 类经验约束调整了策略\"}","exec_detail":"5/6 个深度块完成 / 实际投入 422min / 计划外流失 93min","reflect_detail":"新增 3 条经验 / 画像升级至 v5 （产能系数 0.85，禁用时段 13:00-16:00）"},{"day":6,"metrics":{"planned_focus":315,"done_focus":279,"actual_focus":393,"fulfill_rate":0.886,"hit_rate":0.833,"partial_rate":0.0,"capacity_est":0.85,"capacity_real":0.886,"capacity_error":0.036,"energy_match":0.5,"waste_min":122,"lost_min":86,"switch_count":7,"stuck_predicted":["creative"],"stuck_actual":["creative","deep"],"stuck_hit":0.5,"buffer_ratio":0.3,"max_deep_block":75,"banned_windows":["13:00-16:00"],"cognition":0.813,"total_tasks":8},"profile":{"capacity_ratio":0.864,"type_ratio":{"shallow":0.984,"health":1.067,"deep":1.361,"creative":1.29},"banned_windows":["13:00-16:00"],"gold_windows":["10:00-12:00","17:00-18:00"],"window_fail":{"9":[1,4,6],"10":[1,4],"11":[1,3],"13":[1,2],"14":[1,2],"15":[1,3,5],"16":[1,4],"17":[1,3,4,5,6],"18":[1,2,3],"19":[1,2,3]},"window_ok":{"17":3,"18":4,"19":2,"20":1,"9":3,"10":2,"11":3,"14":1,"15":1,"16":2,"13":1},"max_deep_block":75,"buffer_ratio":0.3,"stuck_hotspots":{"health":0.0,"shallow":0.0,"comms":0.0,"creative":0.55,"deep":0.25},"energy_match":0.0,"version":6},"plan":{"rationale":"今天按 **85% 产能系数** 折算，可投入 459 分钟，留 30% 弹性，最终深度任务排 315 分钟。依据 3 天前那条经验（相似度 0.45）：禁排窗口=13:00-16:00 —— 这个时段不要安排深度工作，留给机械性事务…","capacity":0.85,"buffer":0.3,"maxDeep":75,"prefetch":["creative"],"planned":315,"used":["E42","E31","E21"],"policySource":"mock-policy-v1"},"signal":{"available":720,"meeting":0,"frag":0.17,"high":[["10:00","12:00"],["17:00","18:00"]],"low":[["13:00","16:00"],["21:00","22:00"]],"notes":["自评低能时段：13:00-16:00、21:00-22:00","自评高能时段：10:00-12:00、17:00-18:00"],"energy":{"09:00":3,"10:00":5,"11:00":5,"12:00":3,"13:00":2,"14:00":2,"15:00":2,"16:00":3,"17:00":5,"18:00":3,"19:00":3,"20:00":3,"21:00":2},"backlog":[{"id":"T6-1","title":"长文定稿与配图","est_min":120,"type":"creative","priority":1,"due":""},{"id":"T6-2","title":"留存漏斗数据分析","est_min":105,"type":"deep","priority":1,"due":""},{"id":"T6-3","title":"方案评审稿","est_min":90,"type":"deep","priority":1,"due":""},{"id":"T6-4","title":"会议纪要归档","est_min":45,"type":"shallow","priority":2,"due":""},{"id":"T6-5","title":"邮件与排期同步","est_min":45,"type":"comms","priority":2,"due":""},{"id":"T6-6","title":"健身","est_min":60,"type":"health","priority":2,"due":""},{"id":"T6-7","title":"行业书籍精读","est_min":45,"type":"shallow","priority":3,"due":""},{"id":"T6-8","title":"周报草稿","est_min":45,"type":"comms","priority":3,"due":""}]},"exec":{"done":279,"actual":279,"lost":86,"switches":7},"timeline":[{"s":"09:00","e":"09:52","kind":"focus","title":"留存漏斗数据分析","cost":52,"type":"deep","reason":"高能时段装不下这个长度，退到次优时段","guard":null,"actual":135,"status":"done","flag":"stuck","why":"卡在数据口径对齐，反复回到起点确认定义","assist":[]},{"s":"10:00","e":"11:00","kind":"focus","title":"长文定稿与配图","cost":60,"type":"creative","reason":"排在你的高能时段 10:00-12:00、10:00-12:00","guard":null,"actual":25,"status":"skipped","flag":"carry","why":"上一个任务超时，本块实际只剩 20 分钟可用","assist":[]},{"s":"11:00","e":"11:10","kind":"buffer","title":"切换缓冲","cost":10,"type":"shallow","reason":"你自己的数据：深度块紧接下一个任务时，前 10 分钟基本在走神","guard":null,"actual":0,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"11:10","e":"11:55","kind":"focus","title":"方案评审稿","cost":45,"type":"deep","reason":"排在你的高能时段 10:00-12:00、10:00-12:00","guard":null,"actual":56,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"13:00","e":"16:00","kind":"recovery","title":"主动留白（低能时段）","cost":180,"type":"shallow","reason":"这条来自记忆：13:00-16:00 的历史完成率极低，排了也是浪费。与其自责，不如直接承认它不存在。","guard":"此段不排任何深度任务","actual":180,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"16:00","e":"16:53","kind":"focus","title":"留存漏斗数据分析","cost":53,"type":"deep","reason":"高能时段装不下这个长度，退到次优时段","guard":null,"actual":53,"status":"done","flag":"carry","why":"上一个任务超时，本块实际只剩 42 分钟可用","assist":[]},{"s":"17:00","e":"18:00","kind":"focus","title":"长文定稿与配图","cost":60,"type":"creative","reason":"排在你的高能时段 17:00-18:00、17:00-18:00","guard":null,"actual":80,"status":"done","flag":"stuck","why":"卡点已被提前准备的辅助材料化解","assist":["3 篇同类范文的结构骨架 + 你上次那篇被夸的提纲","3 篇同类范文的结构骨架 + 你上次那篇被夸的提纲"]},{"s":"18:00","e":"18:10","kind":"buffer","title":"切换缓冲","cost":10,"type":"shallow","reason":"你自己的数据：深度块紧接下一个任务时，前 10 分钟基本在走神","guard":null,"actual":10,"status":"done","flag":"ok","why":"吸收了上一个任务的超时 10 分钟","assist":[]},{"s":"18:10","e":"18:55","kind":"focus","title":"方案评审稿","cost":45,"type":"deep","reason":"高能时段装不下这个长度，退到次优时段","guard":null,"actual":44,"status":"done","flag":"carry","why":"上一个任务超时，本块实际只剩 35 分钟可用","assist":[]},{"s":"18:55","e":"19:05","kind":"buffer","title":"切换缓冲","cost":10,"type":"shallow","reason":"你自己的数据：深度块紧接下一个任务时，前 10 分钟基本在走神","guard":null,"actual":0,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"19:05","e":"19:50","kind":"buffer","title":"弹性缓冲","cost":45,"type":"shallow","reason":"按 30% 缓冲留的机动时间。计划的价值不在于排满，而在于**排不完也不会崩**。","guard":null,"actual":0,"status":"done","flag":"ok","why":null,"assist":[]}],"experiences":[],"recall":{"day":6,"scene":"第6天 可用720分钟 会议0分钟 碎片化0.17 待办类型comms/creative/deep/health/shallow 高能时段[['10:00', '12:00'], ['17:00', '18:00']]","hits":[{"id":"E42","sim":0.45,"rerank":0.633,"lesson":"禁排窗口=13:00-16:00 —— 这个时段不要安排深度工作，留给机械性事务"},{"id":"E31","sim":0.446,"rerank":0.6,"lesson":"禁排窗口=18:00-20:00 —— 这个时段不要安排深度工作，留给机械性事务"},{"id":"E21","sim":0.454,"rerank":0.575,"lesson":"禁排窗口=13:00-16:00 —— 这个时段不要安排深度工作，留给机械性事务"}]},"log":[{"agent":"感知 Agent","step":"采集 → 结构化信号","detail":"可用 720min / 会议 0min / 碎片化 17% / 待办 8 项"},{"agent":"规划 Agent","step":"检索经验 → 生成计划","detail":"产能系数 0.85 / 缓冲 30% / 深度块上限 75min / 排入 315min"},{"agent":"执行 Agent","step":"执行 → 记录真实结果","detail":"5/6 个深度块完成 / 实际投入 393min / 计划外流失 86min"},{"agent":"复盘 Agent","step":"提炼经验 → 升级画像","detail":"新增 0 条经验 / 画像升级至 v6 （产能系数 0.86，禁用时段 13:00-16:00）"}],"policy_log":"{\"capacity_ratio\": 0.85, \"banned_windows\": [\"13:00-16:00\"], \"buffer_ratio\": 0.3, \"max_deep_block\": 75, \"prefetch\": [\"creative\"], \"confidence\": 1.0, \"_source\": [\"capacity_ratio\", \"buffer_ratio\", \"max_deep_block\", \"banned_windows\", \"prefetch\"], \"_note\": \"依据 5 类经验约束调整了策略\"}","exec_detail":"5/6 个深度块完成 / 实际投入 393min / 计划外流失 86min","reflect_detail":"新增 0 条经验 / 画像升级至 v6 （产能系数 0.86，禁用时段 13:00-16:00）"},{"day":7,"metrics":{"planned_focus":325,"done_focus":313,"actual_focus":377,"fulfill_rate":0.963,"hit_rate":0.667,"partial_rate":0.333,"capacity_est":0.86,"capacity_real":0.963,"capacity_error":0.103,"energy_match":0.5,"waste_min":86,"lost_min":74,"switch_count":7,"stuck_predicted":["creative"],"stuck_actual":["creative"],"stuck_hit":1.0,"buffer_ratio":0.3,"max_deep_block":75,"banned_windows":["13:00-16:00"],"cognition":0.827,"total_tasks":8},"profile":{"capacity_ratio":0.899,"type_ratio":{"shallow":0.984,"health":1.067,"deep":1.29,"creative":1.325},"banned_windows":["13:00-16:00"],"gold_windows":["10:00-12:00","17:00-18:00"],"window_fail":{"9":[1,4,6],"10":[1,4,7],"11":[1,3,7],"13":[1,2],"14":[1,2],"15":[1,3,5],"16":[1,4],"17":[1,3,4,5,6],"18":[1,2,3],"19":[1,2,3]},"window_ok":{"17":4,"18":5,"19":2,"20":1,"9":4,"10":2,"11":3,"14":1,"15":1,"16":2,"13":1},"max_deep_block":75,"buffer_ratio":0.3,"stuck_hotspots":{"health":0.0,"shallow":0.0,"comms":0.0,"creative":0.45,"deep":0.16},"energy_match":0.0,"version":7},"plan":{"rationale":"今天按 **86% 产能系数** 折算，可投入 464 分钟，留 30% 弹性，最终深度任务排 325 分钟。依据 3 天前那条经验（相似度 0.45）：禁排窗口=13:00-16:00 —— 这个时段不要安排深度工作，留给机械性事务…","capacity":0.86,"buffer":0.3,"maxDeep":75,"prefetch":["creative"],"planned":325,"used":["E42","E31","E21"],"policySource":"mock-policy-v1"},"signal":{"available":720,"meeting":0,"frag":0.15,"high":[["10:00","12:00"],["17:00","18:00"]],"low":[["13:00","16:00"],["21:00","22:00"]],"notes":["自评低能时段：13:00-16:00、21:00-22:00","自评高能时段：10:00-12:00、17:00-18:00"],"energy":{"09:00":3,"10:00":5,"11:00":5,"12:00":3,"13:00":2,"14:00":2,"15:00":2,"16:00":3,"17:00":4,"18:00":3,"19:00":3,"20:00":3,"21:00":2},"backlog":[{"id":"T7-1","title":"长文发布稿","est_min":105,"type":"creative","priority":1,"due":""},{"id":"T7-2","title":"Agent 架构方案定稿","est_min":120,"type":"deep","priority":1,"due":""},{"id":"T7-3","title":"数据报告定稿","est_min":105,"type":"creative","priority":1,"due":""},{"id":"T7-4","title":"客户案例整理","est_min":60,"type":"shallow","priority":2,"due":""},{"id":"T7-5","title":"邮件与排期同步","est_min":45,"type":"comms","priority":2,"due":""},{"id":"T7-6","title":"健身","est_min":60,"type":"health","priority":2,"due":""},{"id":"T7-7","title":"行业书籍精读","est_min":45,"type":"shallow","priority":3,"due":""},{"id":"T7-8","title":"下周计划草稿","est_min":45,"type":"shallow","priority":3,"due":""}]},"exec":{"done":313,"actual":313,"lost":74,"switches":7},"timeline":[{"s":"09:00","e":"10:00","kind":"focus","title":"Agent 架构方案定稿","cost":60,"type":"deep","reason":"高能时段装不下这个长度，退到次优时段","guard":null,"actual":75,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"10:00","e":"10:52","kind":"focus","title":"长文发布稿","cost":52,"type":"creative","reason":"排在你的高能时段 10:00-12:00、10:00-12:00","guard":null,"actual":49,"status":"partial","flag":"stuck","why":"卡点已被提前准备的辅助材料化解","assist":["3 篇同类范文的结构骨架 + 你上次那篇被夸的提纲","3 篇同类范文的结构骨架 + 你上次那篇被夸的提纲"]},{"s":"10:52","e":"11:02","kind":"buffer","title":"切换缓冲","cost":10,"type":"shallow","reason":"你自己的数据：深度块紧接下一个任务时，前 10 分钟基本在走神","guard":null,"actual":0,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"11:02","e":"11:55","kind":"focus","title":"长文发布稿","cost":53,"type":"creative","reason":"排在你的高能时段 10:00-12:00、10:00-12:00","guard":null,"actual":74,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"13:00","e":"16:00","kind":"recovery","title":"主动留白（低能时段）","cost":180,"type":"shallow","reason":"这条来自记忆：13:00-16:00 的历史完成率极低，排了也是浪费。与其自责，不如直接承认它不存在。","guard":"此段不排任何深度任务","actual":180,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"16:00","e":"16:52","kind":"focus","title":"数据报告定稿","cost":52,"type":"creative","reason":"高能时段装不下这个长度，退到次优时段","guard":null,"actual":43,"status":"partial","flag":"carry","why":"上一个任务超时，本块实际只剩 31 分钟可用","assist":[]},{"s":"17:00","e":"18:00","kind":"focus","title":"Agent 架构方案定稿","cost":60,"type":"deep","reason":"排在你的高能时段 17:00-18:00、17:00-18:00","guard":null,"actual":72,"status":"done","flag":"ok","why":null,"assist":[]},{"s":"18:00","e":"18:10","kind":"buffer","title":"切换缓冲","cost":10,"type":"shallow","reason":"你自己的数据：深度块紧接下一个任务时，前 10 分钟基本在走神","guard":null,"actual":10,"status":"done","flag":"ok","why":"吸收了上一个任务的超时 10 分钟","assist":[]},{"s":"18:10","e":"18:58","kind":"focus","title":"数据报告定稿","cost":48,"type":"creative","reason":"高能时段装不下这个长度，退到次优时段","guard":null,"actual":64,"status":"done","flag":"carry","why":"上一个任务超时，本块实际只剩 46 分钟可用","assist":[]},{"s":"18:58","e":"19:08","kind":"buffer","title":"切换缓冲","cost":10,"type":"shallow","reason":"你自己的数据：深度块紧接下一个任务时，前 10 分钟基本在走神","guard":null,"actual":10,"status":"done","flag":"ok","why":"吸收了上一个任务的超时 10 分钟","assist":[]},{"s":"19:08","e":"19:53","kind":"buffer","title":"弹性缓冲","cost":45,"type":"shallow","reason":"按 30% 缓冲留的机动时间。计划的价值不在于排满，而在于**排不完也不会崩**。","guard":null,"actual":6,"status":"done","flag":"ok","why":"吸收了上一个任务的超时 6 分钟","assist":[]}],"experiences":[],"recall":{"day":7,"scene":"第7天 可用720分钟 会议0分钟 碎片化0.15 待办类型comms/creative/deep/health/shallow 高能时段[['10:00', '12:00'], ['17:00', '18:00']]","hits":[{"id":"E42","sim":0.454,"rerank":0.635,"lesson":"禁排窗口=13:00-16:00 —— 这个时段不要安排深度工作，留给机械性事务"},{"id":"E31","sim":0.45,"rerank":0.602,"lesson":"禁排窗口=18:00-20:00 —— 这个时段不要安排深度工作，留给机械性事务"},{"id":"E21","sim":0.458,"rerank":0.577,"lesson":"禁排窗口=13:00-16:00 —— 这个时段不要安排深度工作，留给机械性事务"}]},"log":[{"agent":"感知 Agent","step":"采集 → 结构化信号","detail":"可用 720min / 会议 0min / 碎片化 15% / 待办 8 项"},{"agent":"规划 Agent","step":"检索经验 → 生成计划","detail":"产能系数 0.86 / 缓冲 30% / 深度块上限 75min / 排入 325min"},{"agent":"执行 Agent","step":"执行 → 记录真实结果","detail":"4/6 个深度块完成 / 实际投入 377min / 计划外流失 74min"},{"agent":"复盘 Agent","step":"提炼经验 → 升级画像","detail":"新增 0 条经验 / 画像升级至 v7 （产能系数 0.90，禁用时段 13:00-16:00）"}],"policy_log":"{\"capacity_ratio\": 0.86, \"banned_windows\": [\"13:00-16:00\"], \"buffer_ratio\": 0.3, \"max_deep_block\": 75, \"prefetch\": [\"creative\"], \"confidence\": 1.0, \"_source\": [\"capacity_ratio\", \"buffer_ratio\", \"max_deep_block\", \"banned_windows\", \"prefetch\"], \"_note\": \"依据 5 类经验约束调整了策略\"}","exec_detail":"4/6 个深度块完成 / 实际投入 377min / 计划外流失 74min","reflect_detail":"新增 0 条经验 / 画像升级至 v7 （产能系数 0.90，禁用时段 13:00-16:00）","prompt":"[画像 v6] 产能系数=0.86 缓冲比例=0.30 深度块上限=75 禁排窗口=13:00-16:00 已知卡点=creative\n\n== 检索到的历史经验（few-shot）==\n[LESSON] 第5天 相似度0.45 | 禁排窗口=13:00-16:00 —— 这个时段不要安排深度工作，留给机械性事务\n[LESSON] 第4天 相似度0.45 | 禁排窗口=18:00-20:00 —— 这个时段不要安排深度工作，留给机械性事务\n[LESSON] 第3天 相似度0.46 | 禁排窗口=13:00-16:00 —— 这个时段不要安排深度工作，留给机械性事务\n\n== 今日信号 ==\n可用 720min，会议 0min，高能 [['10:00', '12:00'], ['17:00', '18:00']]，低能 [['13:00', '16:00'], ['21:00', '22:00']]\n待办：[('长文发布稿', 105, 'creative'), ('Agent 架构方案定稿', 120, 'deep'), ('数据报告定稿', 105, 'creative'), ('客户案例整理', 60, 'shallow'), ('邮件与排期同步', 45, 'comms'), ('健身', 60, 'health'), ('行业书籍精读', 45, 'shallow'), ('下周计划草稿', 45, 'shallow')]\n\n请输出策略 JSON。"}],"experiences":[{"id":"E1","day":1,"scene":"计划投入 630 分钟深度工作，实际兑现 414 分钟","decision":"按产能系数 1.00 排的计划","outcome":"真实兑现比例 0.66，与模型信念相差 34%","reflection":"计划一旦超出真实产能，多出来的部分不是被完成，而是变成愧疚感，并且挤压掉后面本来能做完的任务","lesson":"产能系数=0.79 —— 我一天能真正投入的深度工作约为计划的 79%","tags":["capacity","calibration"],"score":0.8},{"id":"E2","day":1,"scene":"安排了一个 180 分钟的深度块：竞品分析长文（终稿）","decision":"整块不拆，一次做到底","outcome":"连续深度工作 95 分钟后注意力崩塌，计划 180 分钟只推进了 86 分钟","reflection":"你的注意力在阈值之后是断崖式下跌，不是缓慢衰减，所以拆成两段（中间插入切换缓冲）远比硬撑划算","lesson":"深度块上限=75 —— 单个深度块不要超过 75 分钟","tags":["collapse","limit"],"score":0.9},{"id":"E11","day":2,"scene":"13:00-15:00 已被安排在深度任务里，且你的精力自评长期处于低值","decision":"按时段顺序填充任务，没有区分时段质量","outcome":"该时段在 2 个不同的日子都失手","reflection":"不是你不想做，是这个时段生理状态不支持深度认知。硬排只会制造失败记录，然后把失败归因成'我不行'","lesson":"禁排窗口=13:00-15:00 —— 这个时段不要安排深度工作，留给机械性事务","tags":["window","energy"],"score":0.85},{"id":"E12","day":2,"scene":"执行「creative」类任务反复受阻","decision":"按时开始，没有提前准备材料","outcome":"在同一个环节反复重写 / 回退 / 重新确认","reflection":"这类任务的卡点是结构性的，不是状态问题 —— 提前给一份骨架，比催你'集中注意力'有效得多","lesson":"卡点=creative —— 遇到这类任务提前准备辅助材料","tags":["stuck","creative"],"score":0.8},{"id":"E13","day":2,"scene":"当天计划外流失 113 分钟","decision":"预留了 10% 的缓冲","outcome":"缓冲被真实需求吃掉了","reflection":"缓冲不是浪费，是让计划具备抗打扰能力的保险费。没有缓冲的计划，一次意外就整体崩塌","lesson":"缓冲比例=0.15 —— 计划里预留 15% 的机动时间","tags":["buffer","resilience"],"score":0.65},{"id":"E21","day":3,"scene":"13:00-16:00 已被安排在深度任务里，且你的精力自评长期处于低值","decision":"按时段顺序填充任务，没有区分时段质量","outcome":"该时段在 2 个不同的日子都失手","reflection":"不是你不想做，是这个时段生理状态不支持深度认知。硬排只会制造失败记录，然后把失败归因成'我不行'","lesson":"禁排窗口=13:00-16:00 —— 这个时段不要安排深度工作，留给机械性事务","tags":["window","energy"],"score":0.85},{"id":"E22","day":3,"scene":"当天计划外流失 93 分钟","decision":"预留了 15% 的缓冲","outcome":"缓冲被真实需求吃掉了","reflection":"缓冲不是浪费，是让计划具备抗打扰能力的保险费。没有缓冲的计划，一次意外就整体崩塌","lesson":"缓冲比例=0.20 —— 计划里预留 20% 的机动时间","tags":["buffer","resilience"],"score":0.65},{"id":"E31","day":4,"scene":"18:00-20:00 已被安排在深度任务里，且你的精力自评长期处于低值","decision":"按时段顺序填充任务，没有区分时段质量","outcome":"该时段在 3 个不同的日子都失手","reflection":"不是你不想做，是这个时段生理状态不支持深度认知。硬排只会制造失败记录，然后把失败归因成'我不行'","lesson":"禁排窗口=18:00-20:00 —— 这个时段不要安排深度工作，留给机械性事务","tags":["window","energy"],"score":0.85},{"id":"E32","day":4,"scene":"当天计划外流失 137 分钟","decision":"预留了 20% 的缓冲","outcome":"缓冲被真实需求吃掉了","reflection":"缓冲不是浪费，是让计划具备抗打扰能力的保险费。没有缓冲的计划，一次意外就整体崩塌","lesson":"缓冲比例=0.25 —— 计划里预留 25% 的机动时间","tags":["buffer","resilience"],"score":0.65},{"id":"E41","day":5,"scene":"计划投入 315 分钟深度工作，实际兑现 295 分钟","decision":"按产能系数 0.81 排的计划","outcome":"真实兑现比例 0.94，与模型信念相差 13%","reflection":"实际产能高于模型估计，模型偏保守了，可以适度放开","lesson":"产能系数=0.85 —— 我一天能真正投入的深度工作约为计划的 85%","tags":["capacity","calibration"],"score":0.6},{"id":"E42","day":5,"scene":"13:00-16:00 已被安排在深度任务里，且你的精力自评长期处于低值","decision":"按时段顺序填充任务，没有区分时段质量","outcome":"该时段在 3 个不同的日子都失手","reflection":"不是你不想做，是这个时段生理状态不支持深度认知。硬排只会制造失败记录，然后把失败归因成'我不行'","lesson":"禁排窗口=13:00-16:00 —— 这个时段不要安排深度工作，留给机械性事务","tags":["window","energy"],"score":0.85},{"id":"E43","day":5,"scene":"当天计划外流失 93 分钟","decision":"预留了 25% 的缓冲","outcome":"缓冲被真实需求吃掉了","reflection":"缓冲不是浪费，是让计划具备抗打扰能力的保险费。没有缓冲的计划，一次意外就整体崩塌","lesson":"缓冲比例=0.30 —— 计划里预留 30% 的机动时间","tags":["buffer","resilience"],"score":0.65}],"finalProfile":{"capacity_ratio":0.899,"type_ratio":{"shallow":0.984,"health":1.067,"deep":1.29,"creative":1.325},"banned_windows":["13:00-16:00"],"gold_windows":["10:00-12:00","17:00-18:00"],"window_fail":{"9":[1,4,6],"10":[1,4,7],"11":[1,3,7],"13":[1,2],"14":[1,2],"15":[1,3,5],"16":[1,4],"17":[1,3,4,5,6],"18":[1,2,3],"19":[1,2,3]},"window_ok":{"17":4,"18":5,"19":2,"20":1,"9":4,"10":2,"11":3,"14":1,"15":1,"16":2,"13":1},"max_deep_block":75,"buffer_ratio":0.3,"stuck_hotspots":{"health":0.0,"shallow":0.0,"comms":0.0,"creative":0.45,"deep":0.16},"energy_match":0.0,"version":7},"recallLog":[{"day":2,"scene":"第2天 可用720分钟 会议0分钟 碎片化0.28 待办类型comms/creative/deep/health/shallow 高能时段[['10:00', '12:00'], ['17:00', '18:00']]","hits":[{"id":"E1","sim":0.392,"rerank":0.585,"lesson":"产能系数=0.79 —— 我一天能真正投入的深度工作约为计划的 79%"},{"id":"E2","sim":0.279,"rerank":0.543,"lesson":"深度块上限=75 —— 单个深度块不要超过 75 分钟"}]},{"day":3,"scene":"第3天 可用600分钟 会议120分钟 碎片化0.47 待办类型comms/creative/deep/health/shallow 高能时段[['11:00', '12:00'], ['17:00', '18:00']]","hits":[{"id":"E11","sim":0.449,"rerank":0.632,"lesson":"禁排窗口=13:00-15:00 —— 这个时段不要安排深度工作，留给机械性事务"},{"id":"E12","sim":0.383,"rerank":0.58,"lesson":"卡点=creative —— 遇到这类任务提前准备辅助材料"},{"id":"E1","sim":0.379,"rerank":0.502,"lesson":"产能系数=0.79 —— 我一天能真正投入的深度工作约为计划的 79%"}]},{"day":4,"scene":"第4天 可用720分钟 会议0分钟 碎片化0.33 待办类型comms/creative/deep/health/shallow 高能时段[['10:00', '12:00']]","hits":[{"id":"E21","sim":0.413,"rerank":0.61,"lesson":"禁排窗口=13:00-16:00 —— 这个时段不要安排深度工作，留给机械性事务"},{"id":"E11","sim":0.379,"rerank":0.54,"lesson":"禁排窗口=13:00-15:00 —— 这个时段不要安排深度工作，留给机械性事务"},{"id":"E12","sim":0.376,"rerank":0.526,"lesson":"卡点=creative —— 遇到这类任务提前准备辅助材料"}]},{"day":5,"scene":"第5天 可用660分钟 会议60分钟 碎片化0.33 待办类型comms/creative/deep/health/shallow 高能时段[['10:00', '12:00'], ['17:00', '18:00']]","hits":[{"id":"E31","sim":0.44,"rerank":0.626,"lesson":"禁排窗口=18:00-20:00 —— 这个时段不要安排深度工作，留给机械性事务"},{"id":"E21","sim":0.453,"rerank":0.597,"lesson":"禁排窗口=13:00-16:00 —— 这个时段不要安排深度工作，留给机械性事务"},{"id":"E11","sim":0.422,"rerank":0.54,"lesson":"禁排窗口=13:00-15:00 —— 这个时段不要安排深度工作，留给机械性事务"}]},{"day":6,"scene":"第6天 可用720分钟 会议0分钟 碎片化0.17 待办类型comms/creative/deep/health/shallow 高能时段[['10:00', '12:00'], ['17:00', '18:00']]","hits":[{"id":"E42","sim":0.45,"rerank":0.633,"lesson":"禁排窗口=13:00-16:00 —— 这个时段不要安排深度工作，留给机械性事务"},{"id":"E31","sim":0.446,"rerank":0.6,"lesson":"禁排窗口=18:00-20:00 —— 这个时段不要安排深度工作，留给机械性事务"},{"id":"E21","sim":0.454,"rerank":0.575,"lesson":"禁排窗口=13:00-16:00 —— 这个时段不要安排深度工作，留给机械性事务"}]},{"day":7,"scene":"第7天 可用720分钟 会议0分钟 碎片化0.15 待办类型comms/creative/deep/health/shallow 高能时段[['10:00', '12:00'], ['17:00', '18:00']]","hits":[{"id":"E42","sim":0.454,"rerank":0.635,"lesson":"禁排窗口=13:00-16:00 —— 这个时段不要安排深度工作，留给机械性事务"},{"id":"E31","sim":0.45,"rerank":0.602,"lesson":"禁排窗口=18:00-20:00 —— 这个时段不要安排深度工作，留给机械性事务"},{"id":"E21","sim":0.458,"rerank":0.577,"lesson":"禁排窗口=13:00-16:00 —— 这个时段不要安排深度工作，留给机械性事务"}]}]};
+const NARR = {"total":190.36,"segments":[{"id":"intro","start":0.0,"dur":14.38,"text":"这是我用一天时间做的产品：MeOS，一个会认识你的个人 Agent 操作系统。它不是日程表，也不是待办清单。它要回答的是，系统能不能通过观察你建立认知模型，然后用这个模型帮你做更好的决策。"},{"id":"problem","start":14.38,"dur":14.18,"text":"先说结论。第一天，系统对你的产能一无所知，只能按你的乐观假设排满六百三十分钟。结果兑现率只有六成六，最没精神的下午塞满了深度工作，一整天的深度块，只有三分之一能完整做完。"},{"id":"result","start":28.56,"dur":14.18,"text":"第七天，系统只给你排三百二十五分钟，比第一天少了四成八，但兑现率是九成六，五成的深度工作落在高能时段，完整完成的深度块从三分之一升到三分之二。这不是模型变强了，是它认识你了。"},{"id":"arch","start":42.74,"dur":6.77,"text":"支撑这件事的，是四个 Agent 组成的闭环：感知、规划、执行、复盘，以及底下的记忆层。"},{"id":"perception","start":49.51,"dur":11.11,"text":"感知 Agent 把脏数据蒸馏成信号：日历、待办、浏览行为、精力自评，输出可支配时间、高能时段和碎片化程度。它不做判断，只做看见。"},{"id":"planner","start":60.62,"dur":16.85,"text":"规划 Agent 是入口。它先拿今天长什么样，去向量记忆里检索相似的历史经验，把踩过的坑和奏效的模式作为样例注入提示词，再让模型输出策略参数，最后由确定性排程器排出时间轴。语言模型负责决策，代码负责算术。"},{"id":"executor","start":77.47,"dur":14.3,"text":"执行 Agent 拆解任务，针对已预测的卡点提前准备辅助材料，并记录每个时间块的真实耗时。它把系统以为自己做到的，和实际发生的，分开记账。因为学习系统最常见的死法，就是自己骗自己。"},{"id":"reflector","start":91.77,"dur":19.99,"text":"复盘 Agent 是进化引擎。它只从计划和实际的差额里学习，不从情绪里学习。一条硬纪律是：三种失败模式必须分开归因。注意力崩塌学的是深度块上限，任务卡点学的是任务类型，低能时段滑走学的是禁排时段。混在一起学，就会得出健身也会卡住这种荒谬结论。"},{"id":"reflector2","start":111.76,"dur":7.34,"text":"而且时段拉黑需要跨天复现，至少在两个不同的日子失手过。因为一天熬夜，不足以改变你的日程。"},{"id":"day7","start":119.1,"dur":15.26,"text":"你看第七天的计划，每一条都有出处。这段主动留白，来自记忆里那条禁排窗口，下午一点到四点。深度块被拆到七十五分钟以内，因为系统从第一天那次崩塌里学到，你的注意力在九十五分钟之后是断崖式下跌。"},{"id":"trace","start":134.36,"dur":11.98,"text":"这是规划 Agent 当时发出的提示词：上面是画像，也就是它的当前信念，下面是按相似度检索到的历史经验，再下面是模型返回的策略参数。整条链路可以回放。"},{"id":"profile","start":146.34,"dur":12.82,"text":"最终画像长这样：产能系数零点九，缓冲三成，深度块上限七十五分钟，禁用时段下午一点到四点，黄金时段上午十点到十二点、下午五点到六点，创意类卡点概率百分之四十五。"},{"id":"truth","start":159.16,"dur":12.98,"text":"对照上帝视角的真实规律：创意类真实卡点概率百分之五十五，系统估到百分之四十五；深度类真实百分之二十六，系统估到百分之十六。它不只知道你的规律，还知道自己不知道什么。"},{"id":"tradeoff","start":172.14,"dur":18.22,"text":"一天的时间，我放弃了用户系统、权限和移动端，全部押在这条闭环上。只有闭环跑通，才可能出现那个它真的懂我的瞬间。给我一周，我会补上真实数据接入、多日负载均衡和长期记忆的遗忘曲线。但今天，它已经能看着你的一天，说出一句你自己的话。"}]};
+const H0 = 540, H1 = 1320;               // 09:00 - 22:00
+const AGENTS = [
+  {id:'perception',nm:'感知 Agent',ic:'◉',c:'#0ea5a4',role:'采集 → 结构化信号'},
+  {id:'planner',   nm:'规划 Agent',ic:'◐',c:'#4f6ef7',role:'检索经验 → 生成计划'},
+  {id:'executor',  nm:'执行 Agent',ic:'⚡',c:'#f59e0b',role:'拆解备料 → 记录真实'},
+  {id:'reflector', nm:'复盘 Agent',ic:'⟳',c:'#7c5cff',role:'提炼经验 → 升级画像'},
+];
+const KIND_LABEL = {focus:'深度工作',buffer:'切换缓冲',recovery:'留白/恢复',health:'身体',admin:'事务'};
+const $ = s => document.querySelector(s);
+const pct = (a,b) => (a-H0)/(H1-H0)*100;
+const fmt = m => String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+const mm = s => parseInt(s.slice(0,2))*60+parseInt(s.slice(3,5));
+
+let S = {day:1, sel:null, playing:false, timers:[]};
+
+/* ============================ 渲染 ============================ */
+function render(){
+  const d = DATA.days.find(x=>x.day===S.day);
+  S.d = d;
+  $('#vtag').textContent = '画像 v'+d.profile.version;
+  $('#tlTitle').textContent = 'DAY '+d.day+' · 今日计划';
+  $('#tlMeta').textContent = `计划 ${d.plan.planned}min · 兑现 ${d.exec.done}min · 产能系数 ${d.plan.capacity.toFixed(2)}`;
+  renderTimeline(d); renderMemory(d); renderAgents(d); renderCurve(); renderCmp(); renderLog(d);
+}
+function renderTimeline(d){
+  let h='<div class="hours">';
+  for(let t=H0;t<=H1;t+=60) h+=`<span style="left:${pct(t)}%">${fmt(t)}</span>`;
+  h+='</div>';
+  // 高能时段与禁用时段作为底纹：这两条恰好就是系统"学会"的东西
+  let bg='';
+  d.plan.used && 0;
+  (d.signal.high||[]).forEach(([a,b])=> bg+=`<div class="gold" style="left:${pct(mm(a))}%;width:${pct(mm(b))-pct(mm(a))}%"></div>`);
+  (d.profile.banned_windows||[]).forEach(w=>{
+    const [a,b]=w.split('-'); bg+=`<div class="ban" style="left:${pct(mm(a))}%;width:${pct(mm(b))-pct(mm(a))}%"></div>`;});
+  const row1 = d.timeline.filter(b=>b.kind==='focus');
+  const row2 = d.timeline.filter(b=>b.kind!=='focus');
+  let t1 = bg, t2 = '';
+  row1.forEach((b,i)=>{
+    const l=pct(mm(b.s)), w=Math.max(pct(mm(b.e))-l,2.4);
+    t1+=`<div class="bk focus ${b.type}" data-i="${i}" data-k="focus" style="left:${l}%;width:${w}%">${b.title}</div>`;
+    const aw = w*Math.min(1.16, b.actual/Math.max(b.cost,1));
+    t1+=`<div class="ab ${b.status}" data-i="${i}" data-k="focus" style="left:${l}%;width:${aw}%;bottom:-8px"></div>`;
+  });
+  row2.forEach((b,i)=>{
+    const l=pct(mm(b.s)), w=Math.max(pct(mm(b.e))-l,1.6);
+    t2+=`<div class="bk ${b.kind}" data-i="${i}" data-k="side" style="left:${l}%;width:${w}%">${b.kind==='recovery'&&b.title.includes('留白')?'留白':''}</div>`;
+  });
+  $('#tl').innerHTML = h
+    + `<div class="track" style="height:44px;overflow:visible">${t1}</div>`
+    + `<div class="track thin">${t2}</div>`
+    + `<div class="legend">
+        <span><i style="background:linear-gradient(135deg,var(--acc),#6b86ff)"></i>深度/分析</span>
+        <span><i style="background:linear-gradient(135deg,var(--acc2),#9a80ff)"></i>创作类</span>
+        <span><i style="background:var(--amber)"></i>切换缓冲</span>
+        <span><i style="background:#e2e8f0"></i>主动留白</span>
+        <span><i style="background:var(--gold,#f59e0b);opacity:.4"></i>高能时段</span>
+        <span><i style="background:repeating-linear-gradient(135deg,#cbd5e1 0 4px,#eef2f8 4px 8px)"></i>已学会的禁用时段</span>
+        <span><i style="background:var(--green)"></i>实际兑现</span>
+        <span><i style="background:var(--rose)"></i>滑走</span>
+      </div>`;
+  $('#rationale').innerHTML = `<b>规划 Agent 决策说明 · 依据 ${d.plan.used.length} 条历史经验</b><br>${hl(d.plan.rationale)}`;
+  $('#tl').querySelectorAll('.bk').forEach(el=>el.onclick=()=>{
+    const k=el.dataset.k, i=+el.dataset.i;
+    const list = k==='focus'?row1:row2; pick(list[i]);
+  });
+  pick(row1.find(b=>b.kind==='recovery')||row1[0]);
+}
+function hl(t){ return (t||'').replace(/\*\*(.+?)\*\*/g,'<b>$1</b>'); }
+function pick(b){
+  if(!b) return;
+  S.sel=b;
+  $('#tl').querySelectorAll('.bk').forEach(e=>{
+    const list=(e.dataset.k==='focus'?S.d.timeline.filter(x=>x.kind==='focus'):S.d.timeline.filter(x=>x.kind!=='focus'));
+    e.classList.toggle('sel', list[+e.dataset.i]===b);
+  });
+  const st = {done:['已完成','g'],partial:['部分完成','a'],skipped:['滑走','r']}[b.status]||['结构块','s'];
+  const flag = {collapse:'注意力崩塌',stuck:'任务卡点',energy:'低能时段滑走',carry:'被上游超时挤占',ok:''}[b.flag]||'';
+  $('#detail').innerHTML =
+    `<div class="t">${b.s}–${b.e} &nbsp;${b.title}
+       <span class="pill ${st[1]}">${st[0]}</span>
+       ${flag?`<span class="pill r">${flag}</span>`:''}
+       ${b.type==='creative'?'<span class="pill b">创作类</span>':''}
+       ${b.kind!=='focus'?`<span class="pill s">${KIND_LABEL[b.kind]||b.kind}</span>`:''}</div>
+     <div class="m">计划 ${b.cost}min · 实际投入 ${b.actual}min${b.kind==='focus'?`（兑现率 ${Math.min(100,Math.round(b.actual/b.cost*100))}%）`:''}</div>
+     <div class="r">决策依据：${b.reason||'—'}</div>
+     ${b.guard?`<div class="g">保护策略：${b.guard}</div>`:''}
+     ${b.why?`<div class="g">执行 Agent 记录：${b.why}</div>`:''}
+     ${(b.assist&&b.assist.length)?`<div class="r">提前备料：${b.assist[0]}</div>`:''}`;
+}
+function renderAgents(d){
+  const m=d.metrics, e=d.exec;
+  const out = {
+    perception:`可用 <b>${d.signal.available}min</b> · 会议 ${d.signal.meeting}min · 碎片化 ${Math.round(d.signal.frag*100)}%
+      <br>高能 ${(d.signal.high||[]).map(x=>x[0]+'-'+x[1]).join('、')||'无'} · 待办 <b>${d.signal.backlog.length}</b> 项`,
+    planner:`策略来源 <b>${d.plan.policySource}</b> · 召回 <b>${(d.recall.hits||[]).length}</b> 条经验
+      <br>产能系数 <b>${d.plan.capacity.toFixed(2)}</b> · 缓冲 ${Math.round(d.plan.buffer*100)}% · 深度块上限 <b>${d.plan.maxDeep}min</b>
+      <br>排入深度工作 <b>${d.plan.planned}min</b>`,
+    executor:`实际投入 <b>${e.actual}min</b> · 兑现 <b>${e.done}min</b>
+      <br>计划外流失 ${e.lost}min · 上下文切换 ${e.switches} 次
+      <br>备料命中 <b>${d.timeline.filter(b=>b.assist&&b.assist.length).length}</b> 个卡点`,
+    reflector:`新增经验 <b>${d.experiences.length}</b> 条 → 画像升级 v<b>${d.profile.version}</b>
+      <br>${d.experiences.map(x=>x.lesson.split(' —— ')[0]).join('<br>')||'（今天没有新规则，画像已收敛）'}`,
+  };
+  $('#agents').innerHTML = AGENTS.map((a,i)=>`
+    <div class="agent" id="ag-${a.id}"><div class="streak"></div>
+      <div class="top"><div class="ic" style="background:${a.c}">${a.ic}</div>
+        <div class="nm">${a.nm}</div><div class="dot"></div></div>
+      <div class="out">${out[a.id]}</div></div>`).join('');
+}
+function renderLog(d){
+  $('#logbox').innerHTML = d.log.map(l=>
+    `<div class="logline"><b>${l.agent.replace(' Agent','')}</b><span>${l.detail}</span></div>`).join('');
+}
+function renderMemory(d){
+  const p=d.profile, st={cap:'产能系数',buf:'缓冲比例',md:'深度块上限',gold:'黄金时段',ban:'禁用时段'};
+  $('#kv').innerHTML = [
+    ['画像版本','v'+p.version],['产能系数',p.capacity_ratio.toFixed(2)],
+    ['缓冲比例',Math.round(p.buffer_ratio*100)+'%'],['深度块上限',p.max_deep_block+'min'],
+    ['情节记忆',DATA.experiences.filter(e=>e.day<=d.day).length+' 条'],
+  ].map(([k,v])=>`<div class="k">${k}</div><div class="v">${v}</div>`).join('');
+  let chips='';
+  (p.banned_windows||[]).forEach(w=>chips+=`<span class="pill r">禁排 ${w}</span>`);
+  (p.gold_windows||[]).forEach(w=>chips+=`<span class="pill a">黄金 ${w}</span>`);
+  Object.entries(p.stuck_hotspots||{}).filter(([,v])=>v>0.35)
+    .forEach(([k,v])=>chips+=`<span class="pill b">卡点 ${k} ${Math.round(v*100)}%</span>`);
+  $('#chips').innerHTML = chips || '<span class="pill s">尚未形成稳定画像</span>';
+  const exps = DATA.experiences.filter(e=>e.day<=d.day).slice(-3).reverse();
+  $('#exps').innerHTML = '<div class="ph" style="padding:9px 0 6px;border:none"><h3>最新情节记忆</h3></div>'+
+    exps.map(e=>`<div class="exp"><div class="ls">${e.lesson}</div>
+      <div class="rf">${e.reflection}</div><div class="sc">${e.id} · score ${e.score} · ${e.tags.join(' / ')}</div></div>`).join('');
+  drawVec(d);
+}
+function drawVec(d){
+  const all = DATA.experiences.filter(e=>e.day<=d.day);
+  const hits = (d.recall.hits||[]).map(h=>h.id);
+  const cx=150, cy=58;
+  let s=`<text x="10" y="14" font-size="9" fill="#a8b4c8">向量记忆库 · 今日召回 ${hits.length} 条</text>`;
+  s+=`<circle cx="${cx}" cy="${cy}" r="4" fill="#14203a"/>`;
+  s+=`<text x="${cx+8}" y="${cy+3}" font-size="8.5" fill="#7c8aa5">今日场景</text>`;
+  all.forEach((e,i)=>{
+    const ang = (i/all.length)*Math.PI*2 - Math.PI/2;
+    const r = 26 + (1-e.score)*14 + (i%3)*5;
+    const x=cx+Math.cos(ang)*r*1.9, y=cy+Math.sin(ang)*r*0.62;
+    const on = hits.includes(e.id);
+    if(on) s+=`<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="#4f6ef7" stroke-width="1" opacity=".5"/>`;
+    s+=`<circle cx="${x}" cy="${y}" r="${on?4.6:3.2}" fill="${on?'#4f6ef7':'#c3ccdd'}" opacity="${on?1:.8}"/>`;
+    if(on) s+=`<text x="${x+6}" y="${y+3}" font-size="8" fill="#4f6ef7">${e.id}</text>`;
+  });
+  (d.recall.hits||[]).slice(0,2).forEach((h,i)=>{
+    s+=`<text x="10" y="${100-i*12}" font-size="8.5" fill="#7c8aa5">召回 ${h.id} · 相似度 ${h.sim} · 重排 ${h.rerank}</text>`;
+  });
+  $('#vec').innerHTML=s;
+}
+function renderCurve(){
+  const W=760,H=168,L=44,R=14,T=16,B=34;
+  const xs=i=>L+i*((W-L-R)/6), ys=v=>H-B-(v)* (H-T-B);
+  const series=[
+    {k:'fulfill_rate',n:'计划兑现率',c:'#4f6ef7'},
+    {k:'energy_match', n:'精力匹配度',c:'#f59e0b'},
+    {k:'cognition',    n:'系统认知分',c:'#7c5cff'},
+  ];
+  let s='';
+  [0,.25,.5,.75,1].forEach(g=>{
+    s+=`<line x1="${L}" y1="${ys(g)}" x2="${W-R}" y2="${ys(g)}" stroke="#eef2f8"/>`;
+    s+=`<text x="${L-8}" y="${ys(g)+3.5}" font-size="9" fill="#a8b4c8" text-anchor="end">${g*100}%</text>`;
+  });
+  for(let i=0;i<7;i++){
+    s+=`<text x="${xs(i)}" y="${H-12}" font-size="9.5" fill="#a8b4c8" text-anchor="middle">Day ${i+1}</text>`;
+    if(i===S.day-1) s+=`<line x1="${xs(i)}" y1="${T-6}" x2="${xs(i)}" y2="${H-B}" stroke="#dbe3f2" stroke-dasharray="3 3"/>`;
+  }
+  series.forEach(se=>{
+    const pts=DATA.days.map((d,i)=>[xs(i),ys(Math.min(1,d.metrics[se.k]))]);
+    s+=`<polyline points="${pts.map(p=>p.join(',')).join(' ')}" fill="none" stroke="${se.c}" stroke-width="2.4"
+        stroke-linejoin="round" stroke-linecap="round"/>`;
+    pts.forEach((p,i)=>{
+      const on=i===S.day-1;
+      s+=`<circle cx="${p[0]}" cy="${p[1]}" r="${on?5:3.4}" fill="#fff" stroke="${se.c}" stroke-width="${on?3:2.2}"/>`;
+      if(on) s+=`<text x="${p[0]}" y="${p[1]-9}" font-size="10" font-weight="700" fill="${se.c}" text-anchor="middle">
+        ${Math.round(DATA.days[i].metrics[se.k]*100)}%</text>`;
+    });
+  });
+  series.forEach((se,i)=>{
+    const lx=W-R-330+i*112;
+    s+=`<rect x="${lx}" y="${T-12}" width="9" height="9" rx="2.5" fill="${se.c}"/>
+        <text x="${lx+13}" y="${T-3.5}" font-size="10.5" fill="#5b6a83">${se.n}</text>`;
+  });
+  $('#curve').innerHTML=s;
+}
+function renderCmp(){
+  const a=DATA.days[0], b=DATA.days[6];
+  const rows=[
+    ['计划深度时长',a.plan.planned+'min',b.plan.planned+'min',false],
+    ['计划兑现率',Math.round(a.metrics.fulfill_rate*100)+'%',Math.round(b.metrics.fulfill_rate*100)+'%',true],
+    ['完整完成深度块',Math.round(a.metrics.hit_rate*100)+'%',Math.round(b.metrics.hit_rate*100)+'%',true],
+    ['精力匹配度',Math.round(a.metrics.energy_match*100)+'%',Math.round(b.metrics.energy_match*100)+'%',true],
+    ['系统认知分',a.metrics.cognition.toFixed(2),b.metrics.cognition.toFixed(2),true],
+    ['深度块上限',a.plan.maxDeep+'min',b.plan.maxDeep+'min',null],
+    ['禁用时段',(a.profile.banned_windows[0]||'—'),(b.profile.banned_windows[0]||'—'),null],
+  ];
+  let s=`<div class="hd"></div><div class="hd d1">DAY 1 系统还不认识你</div><div class="hd d7">DAY 7 系统认识你了</div>`;
+  rows.forEach(([l,x,y,better])=>{
+    let d='';
+    if(better){
+      const nx=parseFloat(x), ny=parseFloat(y);
+      if(!isNaN(nx)&&!isNaN(ny)&&l!=='计划深度时长')
+        d=`<span class="delta ${ny>nx?'up':'down'}">${ny>nx?'▲':'▼'}${Math.abs(ny-nx).toFixed(l.includes('分')?2:0)}</span>`;
+      else if(l==='计划深度时长')
+        d=`<span class="delta up">▼${Math.round((1-parseFloat(ny)/parseFloat(nx))*100)}%</span>`;
+    }
+    s+=`<div class="lb">${l}</div><div class="v" style="color:#c02a4b">${x}</div><div class="v" style="color:#0b7a5b">${y}${d}</div>`;
+  });
+  $('#cmp').innerHTML=s;
+}
+
+/* ============================ 逐日回放 ============================ */
+function clearTimers(){ S.timers.forEach(clearTimeout); S.timers=[]; }
+function at(ms,fn){ S.timers.push(setTimeout(fn,ms)); }
+function playDay(day, speed=1){
+  clearTimers(); closeOv(); S.day=day;
+  document.querySelectorAll('.day').forEach(e=>e.classList.toggle('on',+e.dataset.d===day));
+  document.querySelectorAll('.agent').forEach(e=>e.classList.remove('live','done'));
+  render();
+  const seq=[
+    ['perception',0],['planner',620],['executor',1320],['reflector',2000]
+  ];
+  seq.forEach(([id,t],i)=>{
+    at(t/speed,()=>{
+      document.querySelectorAll('.agent').forEach(e=>e.classList.remove('live'));
+      const el=$('#ag-'+id); if(el) el.classList.add('live');
+      if(i>0){const p=AGENTS[i-1];const pe=$('#ag-'+p.id);if(pe)pe.classList.add('done');}
+      if(i===0){
+        // 感知阶段：先把原始信号铺满，让"看见"这件事有画面
+        const d=S.d;
+        at(0,()=>{$('#logbox').querySelectorAll('.logline').forEach((e,k)=>e.style.opacity=k?'0.25':'1');});
+      }
+    });
+  });
+  at(2500/speed,()=>{
+    document.querySelectorAll('.agent').forEach(e=>{e.classList.remove('live');e.classList.add('done')});
+    $('#logbox').querySelectorAll('.logline').forEach(e=>e.style.opacity=1);
+  });
+}
+
+/* ============================ 演示脚本（与旁白对齐） ============================ */
+function hl2(t){return (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+
+const SCENES = {
+  intro: () => {
+    closeOv();
+    $('#ovc').innerHTML=`
+      <div style="text-align:center;padding:26px 10px 10px">
+        <div style="font-size:56px;font-weight:850;letter-spacing:-2.4px;margin-bottom:10px">MeOS</div>
+        <div style="font-size:21px;color:#3d4d6b;margin-bottom:8px;font-weight:600">一个会"认识你"的个人 Agent 操作系统</div>
+        <div style="font-size:13.5px;color:#7c8aa5;line-height:1.8">
+          感知 → 规划 → 执行 → 复盘 → 进化<br>
+          不是日程表，不是待办清单，而是一个会积累"关于你的知识"的系统</div>
+        <div style="display:flex;gap:26px;justify-content:center;margin-top:30px;font-size:12px;color:#a8b4c8">
+          <span>7 天真实闭环仿真</span><span>${DATA.experiences.length} 条情节记忆</span><span>4 个 Agent</span></div>
+      </div>`;
+    showOv();
+  },
+  problem: () => { closeOv(); playDay(1); },
+  result:  () => { playDay(7); },
+  arch: () => {
+    const nodes=[
+      ['感知 Agent','#0ea5a4','◉','日历 / 待办 / 浏览 / 精力自评 → 可用时间、高能时段、碎片化','它不做判断，只做看见'],
+      ['规划 Agent','#4f6ef7','◐','检索相似历史 → 策略参数 → 确定性排程器排出时间轴','LLM 决策，代码算术'],
+      ['执行 Agent','#f59e0b','⚡','拆解任务 / 针对卡点提前备料 / 记录真实耗时','幻觉与现实的隔离层'],
+      ['复盘 Agent','#7c5cff','⟳','计划 vs 实际 → 结构化经验 → EMA 更新画像','三种失败模式分开归因'],
+    ];
+    $('#ovc').innerHTML=`<h2>四个 Agent，<span>一条闭环</span></h2>
+      <div class="sb">唯一的输出目标不是"今天做了什么"，而是"明天的计划比今天更接近真实的你"</div>
+      <div class="pipe">${nodes.map((n,i)=>`
+        <div class="pnode on"><div class="pt"><span style="color:${n[1]}">${n[2]}</span>${n[0]}</div>
+          <div class="pd">${n[3]}</div><div class="pk">${n[4]}</div></div>
+        ${i<3?'<div class="parrow">→</div>':''}`).join('')}</div>
+      <div class="memstrip"><div class="mt">↓ 记忆层：三个 Agent 共享的"关于你的知识"</div>
+        <div class="md"><b>情节记忆</b>（向量库，按相似度召回）&nbsp;·&nbsp;
+        <b>语义记忆</b>（画像 Profile，EMA 持续更新、可累积、可解释）&nbsp;·&nbsp;
+        <b>工作记忆</b>（当天的 Signal / Plan / 执行状态，跨 Agent 传递）</div></div>`;
+    showOv();
+  },
+  perception: () => { closeOv(); playDay(1); },
+  planner: () => { closeOv(); playDay(7);
+    setTimeout(()=>{ $('#rationale').style.boxShadow='0 0 0 2px rgba(79,110,247,.35)';
+      setTimeout(()=>$('#rationale').style.boxShadow='',2400); },1800); },
+  executor: () => { closeOv(); playDay(7);
+    setTimeout(()=>{ const d=S.d; const c=d.timeline.find(b=>b.kind==='focus'&&b.assist&&b.assist.length);
+      if(c) pick(c); },2600); },
+  reflector: () => { closeOv(); playDay(3); },
+  reflector2: () => {
+    const rows = ['13','14','15','10','11'].map(h=>{
+      const days=[]; const src={};
+      DATA.days.forEach(d=>{const wf=d.profile.window_fail||{}; if(wf[h]) src[d.day]=wf[h];});
+      for(let i=1;i<=7;i++){ const d=DATA.days[i-1]; const wf=d.profile.window_fail||{};
+        days.push((wf[h]||[]).includes(i)); }
+      return [h, days];
+    });
+    $('#ovc').innerHTML=`<h2>拉黑一个时段，需要<span>跨天复现</span></h2>
+      <div class="sb">同一小时至少在两个不同的日子失手过，而且当天你的精力自评是低值。一天熬夜，不足以改变你的日程。</div>
+      <table class="tt"><tr><th>小时</th>${DATA.days.map(d=>`<th>Day ${d.day}</th>`).join('')}<th>判定</th></tr>
+      ${rows.map(([h,ds])=>{
+        const n=ds.filter(Boolean).length;
+        const ok=n>=2;
+        const low=['13','14','15'].includes(h);
+        return `<tr><td>${h}:00</td>${ds.map(v=>`<td style="color:${v?'#c02a4b':'#c3ccdd'}">${v?'✕ 失手':'·'}</td>`).join('')}
+          <td><span class="pill ${ok&&low?'r':'s'}">${ok&&low?'禁排':(ok?'有失败但精力不低':'证据不足')}</span></td></tr>`;}).join('')}
+      </table>
+      <div class="blk" style="margin-top:16px"><div class="bt">为什么这么严格</div>
+        <div class="bd">如果只看"失败"，系统会把高能时段里的策略失误当成时段不好，最后把好时段也封掉。
+        个人系统最典型的退化路径，就是越学越保守，直到什么都不排。禁用时段总长还被限制在 4 小时以内。</div></div>`;
+    showOv();
+  },
+  day7: () => { closeOv(); playDay(7);
+    setTimeout(()=>{ const d=S.d; const b=d.timeline.find(x=>x.kind==='recovery'&&x.title.includes('留白'));
+      if(b) pick(b); },2400);
+    setTimeout(()=>{ const d=S.d; const c=d.timeline.find(x=>x.guard); if(c) pick(c); },5200); },
+  trace: () => {
+    const d=DATA.days[6], ph=(d.recall.hits||[]);
+    const prompt=(d.prompt||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/\[LESSON\]/g,'<span class="g">[LESSON]</span>');
+    $('#ovc').innerHTML=`<h2>规划 Agent 的<span>实际提示词</span></h2>
+      <div class="sb">Day 7 真实发出的 prompt（截取）· 画像 = 当前信念，LESSON = 检索到的历史经验</div>
+      <div class="pw">
+        <pre class="prompt">${prompt}</pre>
+        <div>
+          <div class="blk"><div class="bt">① 检索（向量记忆）</div><div class="bd">
+            ${ph.map(h=>`相似度 <b>${h.sim}</b> · 重排 ${h.rerank}<br><span style="color:#7c8aa5">${h.lesson||''}</span>`).join('<br>')||'（无召回）'}
+            <div style="margin-top:7px;color:#7c8aa5;font-size:11px">重排 = 语义相似度 0.6 + 经验有效性 0.25 + 时间新鲜度 0.15</div>
+          </div></div>
+          <div class="blk"><div class="bt">② 模型返回的策略参数（原样）</div>
+            <div class="bd mono" style="font-size:11px">${(d.policy_log||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</div></div>
+          <div class="blk"><div class="bt">③ 确定性排程器</div><div class="bd">
+            把策略参数落到时间轴：高能时段优先 → 深度块切成均等几段 → 缓冲紧跟深度块 → 禁用时段直接留白。
+            <b>语言模型负责决策，代码负责算术。</b></div></div>
+        </div>
+      </div>`;
+    showOv();
+  },
+  profile: () => {
+    const p=DATA.finalProfile;
+    const hot=Object.entries(p.stuck_hotspots||{}).filter(([,v])=>v>0.35);
+    $('#ovc').innerHTML=`<h2>最终画像 <span>v${p.version}</span></h2>
+      <div class="sb">这是 7 天之后，系统"关于你"的量化认知 —— 每个字段都有一条经验可以追溯</div>
+      <div class="two">
+        <div><div class="blk"><div class="bt">产能与节奏</div><div class="bd">
+          产能系数 <b>${p.capacity_ratio}</b> &nbsp;·&nbsp; 缓冲比例 <b>${Math.round(p.buffer_ratio*100)}%</b><br>
+          深度块上限 <b>${p.max_deep_block} 分钟</b><br>
+          黄金时段 <b>${(p.gold_windows||[]).join('、')||'—'}</b><br>
+          禁用时段 <b>${(p.banned_windows||[]).join('、')||'—'}</b></div></div>
+          <div class="blk"><div class="bt">卡点预测</div><div class="bd">
+          ${hot.map(([k,v])=>`<b>${k}</b> 类任务卡点概率 <b>${Math.round(v*100)}%</b> → 提前备料`).join('<br>')||'—'}</div></div>
+          <div class="blk"><div class="bt">工期膨胀系数（已学习，未启用）</div><div class="bd mono" style="font-size:11px">
+          ${Object.entries(p.type_ratio||{}).map(([k,v])=>`${k}: ${v}`).join(' &nbsp; ')}<br>
+          <span style="color:#7c8aa5">诚实说明：这一项已经在学，但今天的排程器还没有用它，属于"已学习未使用"。</span></div></div>
+        </div>
+        <div><div class="blk"><div class="bt">情节记忆 ${DATA.experiences.length} 条</div><div class="bd"
+          style="max-height:390px;overflow:auto">
+          ${DATA.experiences.map(e=>`<div style="padding:6px 0;border-bottom:1px dashed #eef2f8">
+            <b style="color:#5b3fd6">${e.lesson}</b><div style="color:#7c8aa5;font-size:11px">D${e.day} · ${e.tags.join('/')} · score ${e.score}</div></div>`).join('')}
+        </div></div></div>
+      </div>`;
+    showOv();
+  },
+  truth: () => {
+    const w=DATA.world, p=DATA.finalProfile;
+    const rows=[
+      ['创意类任务卡点概率', w.stuck.creative, (p.stuck_hotspots||{}).creative, '%'],
+      ['深度类任务卡点概率', w.stuck.deep,     (p.stuck_hotspots||{}).deep, '%'],
+      ['注意力崩塌阈值',     w.collapse_min,    p.max_deep_block+15, 'min'],
+    ];
+    $('#ovc').innerHTML=`<h2>系统学到的 vs <span>真实规律</span></h2>
+      <div class="sb">右边是"上帝视角"的模拟现实 —— 4 个 Agent 从来读不到它。学习是否有效，只有这条对照能证明。</div>
+      <table class="tt"><tr><th>指标</th><th>真实规律（隐藏）</th><th>系统学到的</th><th></th></tr>
+      ${rows.map(([l,t,g,u])=>{
+        const tv=u==='%'?Math.round(t*100):t, gv=u==='%'?Math.round(g*100):g;
+        const err=Math.abs(tv-gv)/(tv||1);
+        return `<tr><td>${l}</td><td class="n">${tv}${u}</td><td class="n" style="color:#4f6ef7">${gv}${u}</td>
+          <td><span class="pill ${err<0.25?'g':err<0.5?'a':'r'}">误差 ${Math.round(err*100)}%</span></td></tr>`;}).join('')}
+      </table>
+      <div class="two" style="margin-top:16px">
+        <div class="stat"><div class="n g">${Math.round(DATA.days[6].metrics.fulfill_rate*100)}%</div>
+          <div class="l">第 7 天计划兑现率</div><div class="d">第 1 天是 ${Math.round(DATA.days[0].metrics.fulfill_rate*100)}%。同一个引擎，同一套数据，差别只在"它认不认识你"。</div></div>
+        <div class="stat"><div class="n a">${Math.round(DATA.days[6].metrics.energy_match*100)}%</div>
+          <div class="l">第 7 天精力匹配度</div><div class="d">深度工作落在高能时段的比例。第 1 天是 ${Math.round(DATA.days[0].metrics.energy_match*100)}%。</div></div>
+      </div>`;
+    showOv();
+  },
+  tradeoff: () => {
+    const d1=DATA.days[0], d7=DATA.days[6];
+    $('#ovc').innerHTML=`<h2>一天的<span>取舍</span></h2>
+      <div class="sb">在 10 小时的约束下，选择做什么比做得多好更重要</div>
+      <div class="two">
+        <div><div class="blk" style="border-left:3px solid var(--rose)"><div class="bt" style="color:#c02a4b">主动放弃</div>
+          <div class="bd">用户系统 / 权限 / 移动端 / 多设备同步 / 提醒推送 / 真实日历接入。<br>
+          全部押在一条闭环上：<b>感知 → 规划 → 执行 → 复盘 → 进化</b>。<br>
+          <span style="color:#7c8aa5">理由：只有闭环跑通，才可能出现"它真的懂我"的瞬间。功能堆满但闭环不通的产品，第二天就会被卸载。</span></div></div>
+        <div class="blk" style="border-left:3px solid var(--acc)"><div class="bt">这一天真正做完的</div><div class="bd">
+          真实可跑的引擎（4 Agent + 记忆层 + 策略层）<br>
+          7 天闭环仿真，所有指标来自真实运行<br>
+          离线可跑（无 key 也能演示，换模型只改环境变量）<br>
+          可交互 Demo + 3 分钟演示视频 + 设计文档</div></div>
+        <div class="blk" style="border-left:3px solid var(--green)"><div class="bt" style="color:#0b7a5b">给一周会补什么</div><div class="bd">
+          ① 真实数据接入（日历 / 编辑器活跃度 / 屏幕时间）替换模拟现实<br>
+          ② 多日负载均衡：跨天任务排期，而不是每天从零排<br>
+          ③ 长期记忆的遗忘曲线与冲突检测（旧经验何时失效）<br>
+          ④ 反事实评测：同一份数据跑 A/B 策略，量化"学习"带来的净收益</div></div>
+        </div>
+        <div><div class="stat"><div class="n r">${d1.plan.planned}<span style="font-size:15px">min</span> → <span class="g">${d7.plan.planned}min</span></div>
+          <div class="l">计划深度时长</div><div class="d">系统主动让你少排 ${Math.round((1-d7.plan.planned/d1.plan.planned)*100)}%。计划的价值不在于排满，而在于排不完也不会崩。</div></div>
+          <div class="stat" style="margin-top:12px"><div class="n">${Math.round(d1.metrics.cognition*100)} → <span class="g">${Math.round(d7.metrics.cognition*100)}</span></div>
+          <div class="l">系统认知分（兑现率 45% + 精力匹配 25% + 自我认知准确度 30%）</div>
+          <div class="d">它不只知道你的规律，还知道自己不知道什么。</div></div>
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:26px;font-size:13px;color:#7c8aa5">
+        MeOS v0.1 MVP &nbsp;·&nbsp; 一天做不出完美的产品，但能做出一个有灵魂的 MVP</div>`;
+    showOv();
+  },
+};
+function showOv(){ $('#ov').classList.add('on'); }
+function closeOv(){ $('#ov').classList.remove('on'); }
+
+/* ---- 自动演示：节奏由真实配音时长决定 ---- */
+let RAF=null;
+function autoplay(){
+  S.playing=true; $('#play').classList.add('on'); $('#play').textContent='■ 演示中';
+  const t0=performance.now(); const fired={};
+  const segs=NARR.segments;
+  function tick(){
+    const t=(performance.now()-t0)/1000;
+    segs.forEach(s=>{
+      if(t>=s.start && !fired[s.id]){ fired[s.id]=true; (SCENES[s.id]||(()=>{}))(); }
+    });
+    const cur=[...segs].reverse().find(s=>t>=s.start);
+    if(cur){
+      $('#sub').classList.add('on');
+      $('#sub').innerHTML=cur.text;
+    }
+    if(t > NARR.total + 2.6){
+      $('#sub').innerHTML='MeOS · 一个会"认识你"的个人 Agent 操作系统';
+      S.playing=false; $('#play').textContent='▶ 重新演示';
+      window.__T1__=performance.now(); window.__DONE__=true;
+      return;
+    }
+    RAF=requestAnimationFrame(tick);
+  }
+  window.__T0__=performance.now();
+  tick();
+}
+
+/* 供录屏脚本精确触发：外部调用 startDemo() 的那一刻就是视频的第 0 帧，
+   同时把 T0/T1 暴露出去，事后就能算出录制起始到演示起始的偏移量。 */
+window.startDemo = function(){ if(!S.playing) autoplay(); };
+window.__TDUR__ = NARR.total;
+
+/* ============================ 初始化 ============================ */
+$('#ver').textContent = 'v0.1 MVP · '+DATA.meta.llm;
+$('#days').innerHTML = DATA.days.map(d=>`<div class="day" data-d="${d.day}">${d.day}</div>`).join('');
+$('#days').onclick = e => { const el=e.target.closest('.day');
+  if(el){ cancelAnimationFrame(RAF); $('#sub').classList.remove('on'); $('#play').classList.remove('on');
+    $('#play').textContent='▶ 自动演示'; S.playing=false; playDay(+el.dataset.d); } };
+$('#play').onclick = () => { if(S.playing) return; autoplay(); };
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeOv();
+  if(e.key>='1'&&e.key<='7') playDay(+e.key); });
+$('#ov').onclick = e => { if(e.target===$('#ov')) closeOv(); };
+
+render();
+playDay(1);
+window.__READY__ = true;
+</script>
+</body>
+</html>
